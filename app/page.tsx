@@ -2,6 +2,9 @@
 import { useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 
+type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
+type Transaction = { transaction_id: string; name: string; date: string; amount: number; category?: string[] };
+
 function PlaidLinkButton({ onSuccess }: { onSuccess: (token: string) => void }) {
   const [linkToken, setLinkToken] = useState(null);
 
@@ -41,17 +44,17 @@ function PlaidLinkButton({ onSuccess }: { onSuccess: (token: string) => void }) 
   );
 }
 
-function fmt(amount) {
+function fmt(amount: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
 export default function Home() {
-  const [accessToken, setAccessToken] = useState(null);
-  const [accounts, setAccounts] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const handleSuccess = async (token) => {
+  const handleSuccess = async (token: string) => {
     setAccessToken(token);
     setLoading(true);
     const res = await fetch('/api/plaid/accounts', {
