@@ -88,6 +88,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
 
 export default function Home() {
   const [tab, setTab] = useState<'dashboard' | 'accounts' | 'bills'>('dashboard');
+  const [billsDueSoon, setBillsDueSoon] = useState(0);
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [seiValue, setSeiValue] = useState<string>('');
@@ -213,12 +214,17 @@ export default function Home() {
         <div className="flex gap-3 mb-8">
           {(['dashboard', 'accounts', 'bills'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition capitalize tracking-wide ${
+              className={`relative px-6 py-2.5 rounded-xl text-sm font-semibold transition capitalize tracking-wide ${
                 tab === t
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
                   : 'bg-gray-900 text-gray-400 border border-gray-800 hover:text-white hover:border-gray-600'
               }`}>
               {t}
+              {t === 'bills' && billsDueSoon > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                  {billsDueSoon}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -333,7 +339,13 @@ export default function Home() {
         )}
 
         {/* Bills Tab */}
-        {tab === 'bills' && <BillsTab plaidBills={allBills} />}
+        {tab === 'bills' && (
+          <BillsTab
+            plaidBills={allBills}
+            transactions={allTransactions}
+            onDueCount={setBillsDueSoon}
+          />
+        )}
 
         {/* Accounts Tab */}
         {tab === 'accounts' && (

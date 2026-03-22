@@ -16,6 +16,14 @@ export async function POST(request: Request) {
   return NextResponse.json({ bill: data });
 }
 
+export async function PATCH(request: Request) {
+  const db = getSupabase();
+  const { id, ...updates } = await request.json();
+  const { data, error } = await db.from('bills').update(updates).eq('id', id).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ bill: data });
+}
+
 export async function DELETE(request: Request) {
   const db = getSupabase();
   const { id } = await request.json();
