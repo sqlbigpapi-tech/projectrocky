@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -90,9 +90,10 @@ export default function Home() {
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [seiValue, setSeiValue] = useState<string>('');
+  const seiDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seiLoaded = useRef(false);
 
-  const handleSuccess = async (token: string) => {
-    setLoading(true);
+  const fetchItem = async (token: string) => {
     const [accountsRes, recurringRes] = await Promise.all([
       fetch('/api/plaid/accounts', {
         method: 'POST',
@@ -113,15 +114,71 @@ export default function Home() {
       transactions: accountsData.transactions || [],
       bills: recurringData.bills || [],
     }]);
+  };
+
+  // Load persisted data on mount
+  useEffect(() => {
+    async function loadSaved() {
+      const [itemsRes, seiRes] = await Promise.all([
+        fetch('/api/items'),
+        fetch('/api/settings'),
+      ]);
+      const { items: tokens } = await itemsRes.json();
+      const { value } = await seiRes.json();
+      if (value) {
+        seiLoaded.current = true;
+        setSeiValue(value);
+      } else {
+        seiLoaded.current = true;
+      }
+      if (tokens?.length) {
+        setLoading(true);
+        await Promise.all(tokens.map((token: string) => fetchItem(token)));
+        setLoading(false);
+      }
+    }
+    loadSaved();
+  }, []);
+
+  // Debounce SEI value persistence — skip until after initial load
+  useEffect(() => {
+    if (!seiLoaded.current) return;
+    if (seiDebounce.current) clearTimeout(seiDebounce.current);
+    seiDebounce.current = setTimeout(() => {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: seiValue }),
+      });
+    }, 800);
+  }, [seiValue]);
+
+  const handleSuccess = async (token: string) => {
+    setLoading(true);
+    await Promise.all([
+      fetchItem(token),
+      fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: token }),
+      }),
+    ]);
     setLoading(false);
   };
 
   const handleRemove = async (accessToken: string) => {
-    await fetch('/api/plaid/remove-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: accessToken }),
-    });
+    await Promise.all([
+      fetch('/api/plaid/remove-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken }),
+      }),
+      fetch('/api/items', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken }),
+      }),
+    ]);
     setItems(prev => prev.filter(i => i.accessToken !== accessToken));
   };
 
@@ -148,7 +205,7 @@ export default function Home() {
   return (
     <main suppressHydrationWarning className="min-h-screen bg-gray-950 text-white p-8">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-1">Kong Finance</h1>
+        <h1 className="text-3xl font-bold text-white mb-1"><span suppressHydrationWarning>🦍</span> Kong Finance</h1>
         <p className="text-gray-400 mb-6">Welcome back, David</p>
 
         {/* Tabs */}
