@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import type { GolfData } from '../api/golf/route';
 
 type Team = { name: string; abbr: string; score: string; logo: string };
 type Game = {
@@ -43,6 +44,13 @@ const LEAGUE_BG: Record<string, string> = {
   NBA: 'bg-orange-500/10 border-orange-500/20',
   MLB: 'bg-blue-500/10 border-blue-500/20',
 };
+
+function scoreColor(score: string): string {
+  if (!score || score === '-' || score === 'E') return 'text-gray-300';
+  if (score.startsWith('-')) return 'text-green-400';
+  if (score.startsWith('+')) return 'text-red-400';
+  return 'text-gray-300';
+}
 
 function GameCard({ game }: { game: Game }) {
   const { homeTeam: home, awayTeam: away } = game;
@@ -109,6 +117,131 @@ function GameCard({ game }: { game: Game }) {
   );
 }
 
+function GolfLeaderboard() {
+  const [golf, setGolf] = useState<GolfData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/golf')
+      .then(r => r.json())
+      .then(d => { if (!d.error) setGolf(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 animate-pulse h-48 mb-6" />
+    );
+  }
+
+  if (!golf) return null;
+
+  const isLive = golf.status === 'live';
+  const isFinal = golf.status === 'final';
+
+  // Show rounds as column headers (R1, R2, R3, R4) based on currentRound
+  const roundCols = Array.from({ length: golf.currentRound }, (_, i) => `R${i + 1}`);
+
+  return (
+    <div className={`bg-gray-900 rounded-xl border mb-6 overflow-hidden ${
+      isLive ? 'border-green-500/30' : 'border-gray-800'
+    }`}>
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none hover:bg-gray-800/40 transition-colors"
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-xs font-bold text-yellow-400 font-mono tracking-widest shrink-0">PGA</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold text-white truncate">{golf.tournament}</span>
+            {golf.shortName && golf.shortName !== golf.tournament && (
+              <span className="text-xs text-gray-500 hidden sm:inline">·</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 shrink-0 ml-3">
+          {isLive && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
+          <span className={`text-xs font-medium font-mono ${
+            isLive ? 'text-green-400' : isFinal ? 'text-gray-400' : 'text-gray-500'
+          }`}>{golf.statusDetail}</span>
+          <span className="text-gray-600 text-xs ml-1">{collapsed ? '▸' : '▾'}</span>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <>
+          {/* Column headers */}
+          <div className="grid gap-0 border-t border-gray-800">
+            <div className="grid px-5 py-2 text-xs font-bold text-gray-600 font-mono tracking-widest uppercase"
+              style={{ gridTemplateColumns: '3rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}>
+              <span>POS</span>
+              <span>PLAYER</span>
+              <span className="text-right">TOTAL</span>
+              {roundCols.map(r => (
+                <span key={r} className="text-right">{r}</span>
+              ))}
+            </div>
+
+            {/* Players */}
+            <div className="divide-y divide-gray-800/60">
+              {golf.players.map((player, i) => {
+                const isTop3 = i < 3;
+                return (
+                  <div
+                    key={i}
+                    className={`grid items-center px-5 py-2.5 transition-colors hover:bg-gray-800/30 ${
+                      isTop3 ? 'bg-gray-800/20' : ''
+                    }`}
+                    style={{ gridTemplateColumns: '3rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}
+                  >
+                    {/* Position */}
+                    <span className={`text-xs font-bold font-mono tabular-nums ${
+                      i === 0 ? 'text-yellow-400' : i < 3 ? 'text-gray-300' : 'text-gray-500'
+                    }`}>
+                      {player.position}
+                    </span>
+
+                    {/* Player name */}
+                    <span className={`text-sm truncate pr-2 ${isTop3 ? 'font-semibold text-white' : 'text-gray-300'}`}>
+                      {player.name}
+                    </span>
+
+                    {/* Total score */}
+                    <span className={`text-sm font-bold tabular-nums text-right ${scoreColor(player.score)}`}>
+                      {player.score === 'E' || player.score === '0' ? 'E' : player.score}
+                    </span>
+
+                    {/* Round scores */}
+                    {roundCols.map((_, ri) => {
+                      const val = player.rounds[ri] ?? '-';
+                      const isCurrent = ri === golf.currentRound - 1;
+                      return (
+                        <span
+                          key={ri}
+                          className={`text-xs tabular-nums text-right ${
+                            val === '-' ? 'text-gray-700' :
+                            isCurrent && isLive ? scoreColor(val) + ' font-semibold' :
+                            scoreColor(val)
+                          }`}
+                        >
+                          {val}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SportsTab() {
   const [scores, setScores] = useState<Scores | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,14 +258,13 @@ export default function SportsTab() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 60000); // refresh every minute
+    const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const allGames: Game[] = scores ? [...scores.nfl, ...scores.nba, ...scores.mlb] : [];
   const filtered = filter === 'All' ? allGames : allGames.filter(g => g.league === filter);
 
-  // Sort: favorites first, then live, then scheduled, then final
   const sorted = [...filtered].sort((a, b) => {
     const favA = isFavorite(a.homeTeam, a.league) || isFavorite(a.awayTeam, a.league) ? 0 : 1;
     const favB = isFavorite(b.homeTeam, b.league) || isFavorite(b.awayTeam, b.league) ? 0 : 1;
@@ -167,6 +299,9 @@ export default function SportsTab() {
           </button>
         </div>
       </div>
+
+      {/* PGA Leaderboard */}
+      <GolfLeaderboard />
 
       {/* League filter */}
       <div className="flex gap-2 mb-6">

@@ -4,6 +4,9 @@ import { usePlaidLink } from 'react-plaid-link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import BillsTab from './components/BillsTab';
 import SportsTab from './components/SportsTab';
+import WeatherTab from './components/WeatherTab';
+import BriefingTab from './components/BriefingTab';
+import NewsTab from './components/NewsTab';
 
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
 type Transaction = { transaction_id: string; name: string; date: string; amount: number; category?: string[] };
@@ -88,7 +91,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<'dashboard' | 'accounts' | 'bills' | 'sports'>('dashboard');
+  const [tab, setTab] = useState<'briefing' | 'dashboard' | 'accounts' | 'bills' | 'sports' | 'weather' | 'news'>('briefing');
   const [billsDueSoon, setBillsDueSoon] = useState(0);
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -205,22 +208,40 @@ export default function Home() {
     { label: 'Cash Flow', value: allAccounts.length ? fmt(cashFlow) : '$—', color: cashFlow >= 0 ? 'text-green-400' : 'text-red-400' },
   ];
 
+  const TAB_LABELS: Record<string, string> = {
+    briefing: 'BRIEFING',
+    dashboard: 'FINANCE',
+    accounts: 'ACCOUNTS',
+    bills: 'BILLS',
+    sports: 'SPORTS',
+    weather: 'WEATHER',
+    news: 'NEWS',
+  };
+
   return (
     <main suppressHydrationWarning className="min-h-screen bg-gray-950 text-white p-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-1"><span suppressHydrationWarning>🦍</span> Kong Finance</h1>
-        <p className="text-gray-400 mb-6">Welcome back, David</p>
+      <div className="max-w-6xl mx-auto">
+        {/* Command center header */}
+        <div className="flex justify-between items-start mb-8 pb-6 border-b border-gray-800">
+          <div>
+            <p className="text-xs text-indigo-400 uppercase tracking-[0.3em] font-mono mb-1">Ortiz Command Center</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Mission Control</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-600 uppercase tracking-widest font-mono">Parkland, FL</p>
+          </div>
+        </div>
 
         {/* Tabs */}
-        <div className="flex gap-3 mb-8">
-          {(['dashboard', 'accounts', 'bills', 'sports'] as const).map(t => (
+        <div className="flex gap-2 mb-8 flex-wrap">
+          {(['briefing', 'dashboard', 'accounts', 'bills', 'sports', 'weather', 'news'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`relative px-6 py-2.5 rounded-xl text-sm font-semibold transition capitalize tracking-wide ${
+              className={`relative px-5 py-2 rounded-lg text-xs font-bold transition font-mono tracking-widest ${
                 tab === t
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                  : 'bg-gray-900 text-gray-400 border border-gray-800 hover:text-white hover:border-gray-600'
+                  : 'bg-gray-900 text-gray-500 border border-gray-800 hover:text-white hover:border-gray-600'
               }`}>
-              {t}
+              {TAB_LABELS[t]}
               {t === 'bills' && billsDueSoon > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
                   {billsDueSoon}
@@ -236,12 +257,12 @@ export default function Home() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
               {metrics.map((card) => (
                 <div key={card.label} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <p className="text-gray-400 text-sm mb-1">{card.label}</p>
-                  <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-2">{card.label}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
                 </div>
               ))}
               <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <p className="text-gray-400 text-sm mb-1">SEI Ownership Value</p>
+                <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-2">SEI Ownership</p>
                 <div className="relative">
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-purple-400">$</span>
                   <input
@@ -338,6 +359,24 @@ export default function Home() {
             )}
           </>
         )}
+
+        {/* Briefing Tab */}
+        {tab === 'briefing' && (
+          <BriefingTab
+            bills={allBills}
+            cashFlow={cashFlow}
+            monthlyIncome={monthlyIncome}
+            monthlyExpenses={monthlyExpenses}
+            netWorth={netWorth}
+            hasAccounts={allAccounts.length > 0}
+          />
+        )}
+
+        {/* Weather Tab */}
+        {tab === 'weather' && <WeatherTab />}
+
+        {/* News Tab */}
+        {tab === 'news' && <NewsTab />}
 
         {/* Sports Tab */}
         {tab === 'sports' && <SportsTab />}
