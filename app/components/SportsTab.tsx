@@ -18,10 +18,18 @@ type Scores = { nfl: Game[]; nba: Game[]; mlb: Game[] };
 const LEAGUES = ['All', 'NFL', 'NBA', 'MLB'] as const;
 type LeagueFilter = typeof LEAGUES[number];
 
-const FAVORITES = ['Mets', 'Giants', 'Knicks'];
+type FavoriteRule = { name: string; league?: string };
+const FAVORITES: FavoriteRule[] = [
+  { name: 'Mets' },
+  { name: 'Giants', league: 'NFL' },
+  { name: 'Knicks' },
+];
 
-function isFavorite(team: Team) {
-  return FAVORITES.some(f => team.name.includes(f) || team.abbr === f.toUpperCase());
+function isFavorite(team: Team, league: string) {
+  return FAVORITES.some(f =>
+    (team.name.includes(f.name) || team.abbr.includes(f.name.toUpperCase())) &&
+    (!f.league || f.league === league)
+  );
 }
 
 const LEAGUE_COLORS: Record<string, string> = {
@@ -42,7 +50,7 @@ function GameCard({ game }: { game: Game }) {
   const isFinal = game.status === 'final';
   const homeWins = isFinal && parseInt(home.score) > parseInt(away.score);
   const awayWins = isFinal && parseInt(away.score) > parseInt(home.score);
-  const favoriteInGame = isFavorite(home) || isFavorite(away);
+  const favoriteInGame = isFavorite(home, game.league) || isFavorite(away, game.league);
 
   return (
     <div className={`rounded-xl border p-4 transition hover:border-gray-600 ${
@@ -73,7 +81,7 @@ function GameCard({ game }: { game: Game }) {
               <Image src={away.logo} alt={away.abbr} fill className="object-contain" unoptimized />
             </div>
           )}
-          <span className={`text-sm ${isFavorite(away) ? 'font-bold text-indigo-300' : awayWins ? 'font-bold text-white' : 'text-gray-300'}`}>{away.abbr}</span>
+          <span className={`text-sm ${isFavorite(away, game.league) ? 'font-bold text-indigo-300' : awayWins ? 'font-bold text-white' : 'text-gray-300'}`}>{away.abbr}</span>
         </div>
         <span className={`text-lg tabular-nums ${awayWins ? 'font-bold text-white' : 'font-semibold text-gray-300'}`}>
           {game.status !== 'scheduled' ? away.score : '–'}
@@ -91,7 +99,7 @@ function GameCard({ game }: { game: Game }) {
               <Image src={home.logo} alt={home.abbr} fill className="object-contain" unoptimized />
             </div>
           )}
-          <span className={`text-sm ${isFavorite(home) ? 'font-bold text-indigo-300' : homeWins ? 'font-bold text-white' : 'text-gray-300'}`}>{home.abbr}</span>
+          <span className={`text-sm ${isFavorite(home, game.league) ? 'font-bold text-indigo-300' : homeWins ? 'font-bold text-white' : 'text-gray-300'}`}>{home.abbr}</span>
         </div>
         <span className={`text-lg tabular-nums ${homeWins ? 'font-bold text-white' : 'font-semibold text-gray-300'}`}>
           {game.status !== 'scheduled' ? home.score : '–'}
@@ -126,8 +134,8 @@ export default function SportsTab() {
 
   // Sort: favorites first, then live, then scheduled, then final
   const sorted = [...filtered].sort((a, b) => {
-    const favA = isFavorite(a.homeTeam) || isFavorite(a.awayTeam) ? 0 : 1;
-    const favB = isFavorite(b.homeTeam) || isFavorite(b.awayTeam) ? 0 : 1;
+    const favA = isFavorite(a.homeTeam, a.league) || isFavorite(a.awayTeam, a.league) ? 0 : 1;
+    const favB = isFavorite(b.homeTeam, b.league) || isFavorite(b.awayTeam, b.league) ? 0 : 1;
     if (favA !== favB) return favA - favB;
     const order = { live: 0, scheduled: 1, final: 2 };
     return order[a.status] - order[b.status];
