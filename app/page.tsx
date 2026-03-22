@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 
-function PlaidLinkButton({ onSuccess }) {
+function PlaidLinkButton({ onSuccess }: { onSuccess: (token: string) => void }) {
   const [linkToken, setLinkToken] = useState(null);
 
   const getLinkToken = async () => {
