@@ -274,7 +274,6 @@ export default function BillsTab({
   const prevMonth = () => month === 0 ? (setMonth(11), setYear(y => y - 1)) : setMonth(m => m - 1);
   const nextMonth = () => month === 11 ? (setMonth(0), setYear(y => y + 1)) : setMonth(m => m + 1);
 
-  // List
   const upcoming = bills
     .map(b => ({ ...b, ...getNextOccurrence(b), paid: isPaidThisPeriod(b) }))
     .sort((a, b) => a.daysUntil - b.daysUntil);
@@ -309,33 +308,33 @@ export default function BillsTab({
         <div className="flex gap-2 flex-wrap">
           {transactions.length > 0 && (
             <button onClick={openDetect}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition">
+              className="text-sm px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition">
               Auto-detect
             </button>
           )}
           {plaidBills.length > 0 && (
             <button onClick={syncPlaid} disabled={syncing}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition disabled:opacity-50">
+              className="text-sm px-4 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition disabled:opacity-50">
               {syncing ? 'Syncing…' : 'Sync Plaid'}
             </button>
           )}
           <button onClick={openAdd}
-            className="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+            className="text-sm px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition">
             + Add Bill
           </button>
         </div>
       </div>
 
       {/* Calendar */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6 mb-6">
         <div className="flex justify-between items-center mb-5">
-          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">←</button>
+          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition">←</button>
           <h3 className="font-semibold">{monthName} {year}</h3>
-          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">→</button>
+          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 transition">→</button>
         </div>
         <div className="grid grid-cols-7 gap-1 mb-1">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <div key={d} className="text-center text-xs text-gray-500 font-medium py-1">{d}</div>
+            <div key={d} className="text-center text-xs text-zinc-600 font-medium py-1">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
@@ -348,12 +347,12 @@ export default function BillsTab({
             const allPaid = dayBills.length > 0 && dayBills.every(isPaidThisPeriod);
             return (
               <div key={day} className={`min-h-[72px] rounded-lg p-1.5 border transition ${
-                isToday ? 'border-indigo-500/60 bg-indigo-950/40'
+                isToday ? 'border-amber-500/50 bg-amber-950/20'
                   : allPaid ? 'border-green-800/40 bg-green-950/20'
-                  : dayBills.length ? 'border-gray-700 bg-gray-800/40'
-                  : 'border-gray-800/40 bg-gray-800/10'
+                  : dayBills.length ? 'border-zinc-700 bg-zinc-800/40'
+                  : 'border-zinc-800/40 bg-zinc-800/10'
               }`}>
-                <p className={`text-xs font-semibold mb-1 ${isToday ? 'text-indigo-400' : 'text-gray-500'}`}>{day}</p>
+                <p className={`text-xs font-semibold mb-1 ${isToday ? 'text-amber-400' : 'text-zinc-600'}`}>{day}</p>
                 {dayBills.length > 0 && (
                   <>
                     <button onClick={() => openEdit(dayBills[0])}
@@ -377,42 +376,42 @@ export default function BillsTab({
 
       {/* Bill list */}
       {upcoming.length > 0 ? (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-          <h3 className="font-semibold mb-4">All Bills</h3>
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-6">
+          <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">All Bills</h3>
           <div className="space-y-3">
             {upcoming.map((bill, idx) => (
               <div key={`${bill.id}-${idx}`}
-                className={`flex justify-between items-center border-b border-gray-800 pb-3 last:border-0 last:pb-0 transition ${bill.paid ? 'opacity-50' : ''}`}>
+                className={`flex justify-between items-center border-b border-zinc-800 pb-3 last:border-0 last:pb-0 transition ${bill.paid ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-3 min-w-0">
                   <button onClick={() => togglePaid(bill)}
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
-                      bill.paid ? 'bg-green-500 border-green-500' : 'border-gray-600 hover:border-green-400'
+                      bill.paid ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600 hover:border-emerald-400'
                     }`}>
-                    {bill.paid && <span className="text-white text-xs leading-none">✓</span>}
+                    {bill.paid && <span className="text-black text-xs leading-none font-bold">✓</span>}
                   </button>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`font-medium text-sm ${bill.paid ? 'line-through text-gray-500' : ''}`}>{bill.name}</p>
-                      <span className="text-xs bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded">{bill.category || 'Other'}</span>
+                      <p className={`font-medium text-sm ${bill.paid ? 'line-through text-zinc-500' : ''}`}>{bill.name}</p>
+                      <span className="text-xs bg-zinc-900 text-zinc-500 px-1.5 py-0.5 rounded border border-zinc-800">{bill.category || 'Other'}</span>
                       {bill.source === 'plaid' && (
-                        <span className="text-xs bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded">Plaid</span>
+                        <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/25">Plaid</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 capitalize">
+                    <p className="text-xs text-zinc-600 mt-0.5 capitalize">
                       {FREQ_LABELS[bill.frequency]} · due {bill.date}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-2">
                   <div className="text-right">
-                    <p className={`font-bold text-sm ${bill.paid ? 'text-green-500' : 'text-red-400'}`}>{fmt(bill.amount)}</p>
+                    <p className={`font-bold text-sm ${bill.paid ? 'text-emerald-500' : 'text-red-400'}`}>{fmt(bill.amount)}</p>
                     {!bill.paid && (
-                      <p className={`text-xs ${bill.daysUntil <= 7 ? 'text-yellow-400' : 'text-gray-600'}`}>
+                      <p className={`text-xs ${bill.daysUntil <= 7 ? 'text-yellow-400' : 'text-zinc-600'}`}>
                         {bill.daysUntil < 0 ? 'overdue' : bill.daysUntil === 0 ? 'today' : `in ${bill.daysUntil}d`}
                       </p>
                     )}
                   </div>
-                  <button onClick={() => openEdit(bill)} className="text-gray-600 hover:text-gray-300 text-xs transition">edit</button>
+                  <button onClick={() => openEdit(bill)} className="text-zinc-600 hover:text-zinc-300 text-xs transition">edit</button>
                   <button onClick={() => deleteBill(bill.id)} className="text-red-900 hover:text-red-400 transition">✕</button>
                 </div>
               </div>
@@ -420,44 +419,44 @@ export default function BillsTab({
           </div>
         </div>
       ) : (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-10 text-center text-gray-500">
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-10 text-center text-zinc-500">
           No bills yet — add one manually, sync from Plaid, or use Auto-detect.
         </div>
       )}
 
       {/* Add / Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={closeModal}>
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-5">{editBill ? 'Edit Bill' : 'Add Bill'}</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-gray-400 block mb-1">Name</label>
+                <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">Name</label>
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Netflix, Rent, etc."
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 placeholder-zinc-600" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Amount</label>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">Amount</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
                     <input type="number" min="0" step="0.01" value={form.amount}
                       onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00"
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-7 pr-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-7 pr-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Due Date</label>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">Due Date</label>
                   <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Frequency</label>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">Frequency</label>
                   <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
                     <option value="once">One-time</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
@@ -465,27 +464,27 @@ export default function BillsTab({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Category</label>
+                  <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">Category</label>
                   <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">
+                <label className="text-xs text-zinc-500 uppercase tracking-widest font-mono block mb-1">
                   Remind me <span className="text-white font-semibold">{form.reminder_days_before} day{form.reminder_days_before !== '1' ? 's' : ''}</span> before
                 </label>
                 <input type="range" min="0" max="14" value={form.reminder_days_before}
                   onChange={e => setForm(f => ({ ...f, reminder_days_before: e.target.value }))}
-                  className="w-full accent-indigo-500" />
-                <div className="flex justify-between text-xs text-gray-600 mt-1"><span>0</span><span>14</span></div>
+                  className="w-full accent-amber-500" />
+                <div className="flex justify-between text-xs text-zinc-700 mt-1"><span>0</span><span>14</span></div>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={closeModal} className="flex-1 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white transition text-sm">Cancel</button>
+              <button onClick={closeModal} className="flex-1 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white transition text-sm">Cancel</button>
               <button onClick={saveBill} disabled={!form.name || !form.amount || !form.due_date}
-                className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition text-sm disabled:opacity-40">
+                className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition text-sm disabled:opacity-40">
                 {editBill ? 'Save' : 'Add Bill'}
               </button>
             </div>
@@ -495,24 +494,24 @@ export default function BillsTab({
 
       {/* Auto-detect Modal */}
       {showDetect && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowDetect(false)}>
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowDetect(false)}>
+          <div className="bg-zinc-950 border border-zinc-700 rounded-2xl p-6 w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-1">Auto-detected Bills</h3>
-            <p className="text-sm text-gray-400 mb-4">Recurring patterns found in your transaction history. Select which to import.</p>
+            <p className="text-sm text-zinc-400 mb-4">Recurring patterns found in your transaction history. Select which to import.</p>
             {detected.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">No new recurring patterns detected.</p>
+              <p className="text-zinc-500 text-sm text-center py-8">No new recurring patterns detected.</p>
             ) : (
               <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
                 {detected.map((d, i) => (
                   <label key={i} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${
-                    d.selected ? 'border-indigo-500/50 bg-indigo-950/20' : 'border-gray-800 bg-gray-800/20'
+                    d.selected ? 'border-amber-500/40 bg-amber-950/15' : 'border-zinc-800 bg-zinc-900/20'
                   }`}>
                     <input type="checkbox" checked={d.selected}
                       onChange={e => setDetected(prev => prev.map((x, j) => j === i ? { ...x, selected: e.target.checked } : x))}
-                      className="accent-indigo-500 w-4 h-4 shrink-0" />
+                      className="accent-amber-500 w-4 h-4 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{d.name}</p>
-                      <p className="text-xs text-gray-400 capitalize">{d.frequency} · next due {d.due_date} · {d.category}</p>
+                      <p className="text-xs text-zinc-500 capitalize">{d.frequency} · next due {d.due_date} · {d.category}</p>
                     </div>
                     <p className="font-bold text-red-400 text-sm shrink-0">{fmt(d.amount)}</p>
                   </label>
@@ -520,10 +519,10 @@ export default function BillsTab({
               </div>
             )}
             <div className="flex gap-3 mt-auto">
-              <button onClick={() => setShowDetect(false)} className="flex-1 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white transition text-sm">Cancel</button>
+              <button onClick={() => setShowDetect(false)} className="flex-1 py-2 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white transition text-sm">Cancel</button>
               {detected.length > 0 && (
                 <button onClick={importDetected} disabled={importing || !detected.some(d => d.selected)}
-                  className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition text-sm disabled:opacity-40">
+                  className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold transition text-sm disabled:opacity-40">
                   {importing ? 'Importing…' : `Import ${detected.filter(d => d.selected).length}`}
                 </button>
               )}

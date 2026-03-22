@@ -40,6 +40,15 @@ function weatherIcon(code: number): string {
   return '🌡️';
 }
 
+function conditionToCode(condition: string): number {
+  const map: Record<string, number> = {
+    'Clear': 0, 'Mostly Clear': 1, 'Overcast': 3, 'Foggy': 45,
+    'Drizzle': 51, 'Rain': 61, 'Snow': 71, 'Showers': 80,
+    'Snow Showers': 85, 'Thunderstorm': 95,
+  };
+  return map[condition] ?? 0;
+}
+
 function dayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   const today = new Date();
@@ -71,17 +80,15 @@ export default function WeatherTab() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 animate-pulse h-48" />
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-8 animate-pulse h-48" />
         <div className="grid grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-gray-900 rounded-xl border border-gray-800 p-4 animate-pulse h-32" />
+            <div key={i} className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 animate-pulse h-32" />
           ))}
         </div>
       </div>
@@ -90,7 +97,7 @@ export default function WeatherTab() {
 
   if (error || !data) {
     return (
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center text-gray-500">
+      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-12 text-center text-zinc-500">
         Weather data unavailable.
       </div>
     );
@@ -105,26 +112,26 @@ export default function WeatherTab() {
         <h2 className="text-lg font-semibold">Weather</h2>
         <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-zinc-600">
               Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
-          <button onClick={load} className="text-xs text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-3 py-1.5 rounded-lg transition">
+          <button onClick={load} className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 rounded-lg transition">
             Refresh
           </button>
         </div>
       </div>
 
       {/* Current conditions */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+      <div className="bg-zinc-950 rounded-xl border border-amber-600/20 p-6">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-1">{data.location}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">{data.location}</p>
             <div className="flex items-end gap-4">
               <span className="text-7xl font-bold text-white tabular-nums">{c.temp}°</span>
               <div className="pb-2">
-                <p className="text-xl text-gray-300">{c.condition}</p>
-                <p className="text-sm text-gray-500">Feels like {c.feelsLike}°</p>
+                <p className="text-xl text-zinc-200">{c.condition}</p>
+                <p className="text-sm text-zinc-500">Feels like {c.feelsLike}°</p>
               </div>
             </div>
           </div>
@@ -132,18 +139,18 @@ export default function WeatherTab() {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-gray-800">
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-zinc-800">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-1">Humidity</p>
-            <p className="text-lg font-semibold text-cyan-400">{c.humidity}%</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">Humidity</p>
+            <p className="text-lg font-semibold text-zinc-100 tabular-nums">{c.humidity}%</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-1">Wind</p>
-            <p className="text-lg font-semibold text-cyan-400">{c.windSpeed} mph {c.windDir}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">Wind</p>
+            <p className="text-lg font-semibold text-zinc-100">{c.windSpeed} mph {c.windDir}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-1">Precip</p>
-            <p className="text-lg font-semibold text-cyan-400">{c.precip}&quot;</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">Precip</p>
+            <p className="text-lg font-semibold text-zinc-100 tabular-nums">{c.precip}&quot;</p>
           </div>
         </div>
       </div>
@@ -151,24 +158,13 @@ export default function WeatherTab() {
       {/* 5-day forecast */}
       <div className="grid grid-cols-5 gap-3">
         {data.forecast.map((day) => (
-          <div key={day.date} className="bg-gray-900 rounded-xl border border-gray-800 p-4 text-center">
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-2">{dayLabel(day.date)}</p>
-            <span className="text-3xl block mb-2">{weatherIcon(
-              day.condition === 'Clear' ? 0 :
-              day.condition === 'Mostly Clear' ? 1 :
-              day.condition === 'Overcast' ? 3 :
-              day.condition === 'Foggy' ? 45 :
-              day.condition === 'Drizzle' ? 51 :
-              day.condition === 'Rain' ? 61 :
-              day.condition === 'Snow' ? 71 :
-              day.condition === 'Showers' ? 80 :
-              day.condition === 'Snow Showers' ? 85 :
-              day.condition === 'Thunderstorm' ? 95 : 0
-            )}</span>
-            <p className="text-xs text-gray-400 mb-3">{day.condition}</p>
+          <div key={day.date} className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 text-center hover:border-zinc-700 transition">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-2">{dayLabel(day.date)}</p>
+            <span className="text-3xl block mb-2">{weatherIcon(conditionToCode(day.condition))}</span>
+            <p className="text-xs text-zinc-600 mb-3">{day.condition}</p>
             <div className="flex justify-center gap-2 tabular-nums">
               <span className="text-sm font-bold text-white">{day.high}°</span>
-              <span className="text-sm text-gray-600">{day.low}°</span>
+              <span className="text-sm text-zinc-600">{day.low}°</span>
             </div>
             {day.precipChance > 0 && (
               <p className="text-xs text-blue-400 mt-1">{day.precipChance}% 💧</p>

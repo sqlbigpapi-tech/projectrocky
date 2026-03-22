@@ -13,7 +13,7 @@ type Transaction = { transaction_id: string; name: string; date: string; amount:
 type Bill = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
 type ConnectedItem = { accessToken: string; accounts: Account[]; transactions: Transaction[]; bills: Bill[] };
 
-const COLORS = ['#6366f1','#22d3ee','#f59e0b','#10b981','#f43f5e','#a78bfa','#fb923c','#34d399'];
+const COLORS = ['#F59E0B','#ffffff','#EF4444','#10b981','#F97316','#a78bfa','#fb923c','#34d399'];
 
 function fmt(amount: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -36,14 +36,14 @@ function SpendingChart({ transactions }: { transactions: Transaction[] }) {
   if (data.length === 0 || !mounted) return null;
 
   return (
-    <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-      <h2 className="text-lg font-semibold mb-4">Spending by Category</h2>
+    <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
+      <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Spending by Category</h2>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={55}>
             {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
           </Pie>
-          <Tooltip formatter={(v) => fmt(Number(v))} />
+          <Tooltip formatter={(v) => fmt(Number(v))} contentStyle={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '8px', color: '#fff' }} />
           <Legend wrapperStyle={{ fontSize: '13px' }} />
         </PieChart>
       </ResponsiveContainer>
@@ -76,7 +76,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
   if (!linkToken) {
     return (
       <button onClick={getLinkToken}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-lg transition text-sm">
+        className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2.5 rounded-lg transition text-sm">
         + {label}
       </button>
     );
@@ -84,7 +84,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
 
   return (
     <button onClick={() => open()} disabled={!ready}
-      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-lg transition text-sm">
+      className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2.5 rounded-lg transition text-sm disabled:opacity-50">
       Open Bank Login
     </button>
   );
@@ -122,7 +122,6 @@ export default function Home() {
     }]);
   };
 
-  // Load persisted data on mount
   useEffect(() => {
     async function loadSaved() {
       const [itemsRes, seiRes] = await Promise.all([
@@ -146,7 +145,6 @@ export default function Home() {
     loadSaved();
   }, []);
 
-  // Debounce SEI value persistence — skip until after initial load
   useEffect(() => {
     if (!seiLoaded.current) return;
     if (seiDebounce.current) clearTimeout(seiDebounce.current);
@@ -202,10 +200,10 @@ export default function Home() {
   const cashFlow = monthlyIncome - monthlyExpenses;
 
   const metrics = [
-    { label: 'Net Worth', value: allAccounts.length || seiParsed ? fmt(netWorth) : '$—', color: 'text-green-400' },
-    { label: 'Monthly Income', value: allAccounts.length ? fmt(monthlyIncome) : '$—', color: 'text-blue-400' },
+    { label: 'Net Worth', value: allAccounts.length || seiParsed ? fmt(netWorth) : '$—', color: 'text-amber-400' },
+    { label: 'Monthly Income', value: allAccounts.length ? fmt(monthlyIncome) : '$—', color: 'text-emerald-400' },
     { label: 'Monthly Expenses', value: allAccounts.length ? fmt(monthlyExpenses) : '$—', color: 'text-red-400' },
-    { label: 'Cash Flow', value: allAccounts.length ? fmt(cashFlow) : '$—', color: cashFlow >= 0 ? 'text-green-400' : 'text-red-400' },
+    { label: 'Cash Flow', value: allAccounts.length ? fmt(cashFlow) : '$—', color: cashFlow >= 0 ? 'text-emerald-400' : 'text-red-400' },
   ];
 
   const TAB_LABELS: Record<string, string> = {
@@ -219,16 +217,16 @@ export default function Home() {
   };
 
   return (
-    <main suppressHydrationWarning className="min-h-screen bg-gray-950 text-white p-8">
+    <main suppressHydrationWarning className="min-h-screen bg-black text-white p-8">
       <div className="max-w-6xl mx-auto">
         {/* Command center header */}
-        <div className="flex justify-between items-start mb-8 pb-6 border-b border-gray-800">
+        <div className="flex justify-between items-start mb-8 pb-6 border-b border-zinc-800">
           <div>
-            <p className="text-xs text-indigo-400 uppercase tracking-[0.3em] font-mono mb-1">Ortiz Command Center</p>
+            <p className="text-xs text-amber-400 uppercase tracking-[0.3em] font-mono mb-1">Ortiz Command Center</p>
             <h1 className="text-3xl font-bold text-white tracking-tight">Mission Control</h1>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-600 uppercase tracking-widest font-mono">Parkland, FL</p>
+            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono">Parkland, FL</p>
           </div>
         </div>
 
@@ -238,8 +236,8 @@ export default function Home() {
             <button key={t} onClick={() => setTab(t)}
               className={`relative px-5 py-2 rounded-lg text-xs font-bold transition font-mono tracking-widest ${
                 tab === t
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                  : 'bg-gray-900 text-gray-500 border border-gray-800 hover:text-white hover:border-gray-600'
+                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                  : 'bg-zinc-950 text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-600'
               }`}>
               {TAB_LABELS[t]}
               {t === 'bills' && billsDueSoon > 0 && (
@@ -250,115 +248,6 @@ export default function Home() {
             </button>
           ))}
         </div>
-
-        {/* Dashboard Tab */}
-        {tab === 'dashboard' && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-              {metrics.map((card) => (
-                <div key={card.label} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-2">{card.label}</p>
-                  <p className={`text-2xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
-                </div>
-              ))}
-              <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <p className="text-xs text-gray-500 uppercase tracking-widest font-mono mb-2">SEI Ownership</p>
-                <div className="relative">
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-purple-400">$</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={seiValue}
-                    onChange={e => setSeiValue(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full bg-transparent pl-6 text-2xl font-bold text-purple-400 placeholder-gray-700 focus:outline-none"
-                  />
-                </div>
-                <p className="text-xs text-gray-600 mt-1">Included in net worth</p>
-              </div>
-            </div>
-
-            {loading && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center text-gray-400 mb-6">
-                Loading your accounts...
-              </div>
-            )}
-
-            {allTransactions.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <SpendingChart transactions={allTransactions} />
-                <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-                  <h2 className="text-lg font-semibold mb-4">Top 5 Purchases</h2>
-                  <div className="space-y-3">
-                    {[...allTransactions]
-                      .filter(t => t.amount > 0)
-                      .sort((a, b) => b.amount - a.amount)
-                      .slice(0, 5)
-                      .map((t, i) => (
-                        <div key={t.transaction_id} className="flex items-center gap-3 border-b border-gray-800 pb-3">
-                          <span className="text-gray-600 text-sm w-4">{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{t.name}</p>
-                            <p className="text-sm text-gray-400">{t.date}</p>
-                          </div>
-                          <p className="font-bold text-red-400 shrink-0">{fmt(t.amount)}</p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {allBills.length > 0 && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-                <h2 className="text-lg font-semibold mb-4">Upcoming Bills</h2>
-                <div className="space-y-3">
-                  {allBills.map((bill, i) => (
-                    <div key={i} className="flex justify-between items-center border-b border-gray-800 pb-3">
-                      <div>
-                        <p className="font-medium">{bill.name}</p>
-                        <p className="text-sm text-gray-400 capitalize">{bill.frequency} · due {bill.nextDate}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-red-400">{fmt(bill.amount)}</p>
-                        <p className={`text-xs mt-0.5 ${bill.daysUntil <= 7 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                          {bill.daysUntil === 0 ? 'due today' : `in ${bill.daysUntil}d`}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {allTransactions.length > 0 && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-                <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
-                <div className="space-y-3">
-                  {allTransactions.slice(0, 10).map((txn) => (
-                    <div key={txn.transaction_id} className="flex justify-between items-center border-b border-gray-800 pb-3">
-                      <div>
-                        <p className="font-medium">{txn.name}</p>
-                        <p className="text-sm text-gray-400">{txn.date} · {txn.category?.[0] || 'Uncategorized'}</p>
-                      </div>
-                      <p className={`font-bold ${txn.amount > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {txn.amount > 0 ? '-' : '+'}{fmt(Math.abs(txn.amount))}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {items.length === 0 && !loading && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-                <h2 className="text-lg font-semibold mb-2">Get Started</h2>
-                <p className="text-gray-400 mb-4">Connect a bank account to see your finances.</p>
-                <PlaidLinkButton onSuccess={handleSuccess} />
-              </div>
-            )}
-          </>
-        )}
 
         {/* Briefing Tab */}
         {tab === 'briefing' && (
@@ -378,6 +267,115 @@ export default function Home() {
         {/* News Tab */}
         {tab === 'news' && <NewsTab />}
 
+        {/* Dashboard Tab */}
+        {tab === 'dashboard' && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+              {metrics.map((card) => (
+                <div key={card.label} className="bg-zinc-950 rounded-xl p-4 border border-zinc-800">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-2">{card.label}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
+                </div>
+              ))}
+              <div className="bg-zinc-950 rounded-xl p-4 border border-zinc-800">
+                <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-2">SEI Ownership</p>
+                <div className="relative">
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-bold text-amber-400">$</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={seiValue}
+                    onChange={e => setSeiValue(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-transparent pl-6 text-2xl font-bold text-amber-400 placeholder-zinc-700 focus:outline-none"
+                  />
+                </div>
+                <p className="text-xs text-zinc-600 mt-1">Included in net worth</p>
+              </div>
+            </div>
+
+            {loading && (
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800 text-center text-zinc-500 mb-6">
+                Loading your accounts...
+              </div>
+            )}
+
+            {allTransactions.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <SpendingChart transactions={allTransactions} />
+                <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
+                  <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Top 5 Purchases</h2>
+                  <div className="space-y-3">
+                    {[...allTransactions]
+                      .filter(t => t.amount > 0)
+                      .sort((a, b) => b.amount - a.amount)
+                      .slice(0, 5)
+                      .map((t, i) => (
+                        <div key={t.transaction_id} className="flex items-center gap-3 border-b border-zinc-800 pb-3">
+                          <span className="text-zinc-600 text-sm w-4">{i + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{t.name}</p>
+                            <p className="text-sm text-zinc-500">{t.date}</p>
+                          </div>
+                          <p className="font-bold text-red-400 shrink-0">{fmt(t.amount)}</p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {allBills.length > 0 && (
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800 mb-6">
+                <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Upcoming Bills</h2>
+                <div className="space-y-3">
+                  {allBills.map((bill, i) => (
+                    <div key={i} className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                      <div>
+                        <p className="font-medium">{bill.name}</p>
+                        <p className="text-sm text-zinc-500 capitalize">{bill.frequency} · due {bill.nextDate}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-red-400">{fmt(bill.amount)}</p>
+                        <p className={`text-xs mt-0.5 ${bill.daysUntil <= 7 ? 'text-yellow-400' : 'text-zinc-600'}`}>
+                          {bill.daysUntil === 0 ? 'due today' : `in ${bill.daysUntil}d`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {allTransactions.length > 0 && (
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800 mb-6">
+                <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Recent Transactions</h2>
+                <div className="space-y-3">
+                  {allTransactions.slice(0, 10).map((txn) => (
+                    <div key={txn.transaction_id} className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                      <div>
+                        <p className="font-medium">{txn.name}</p>
+                        <p className="text-sm text-zinc-500">{txn.date} · {txn.category?.[0] || 'Uncategorized'}</p>
+                      </div>
+                      <p className={`font-bold ${txn.amount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {txn.amount > 0 ? '-' : '+'}{fmt(Math.abs(txn.amount))}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {items.length === 0 && !loading && (
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
+                <h2 className="text-lg font-semibold mb-2">Get Started</h2>
+                <p className="text-zinc-400 mb-4">Connect a bank account to see your finances.</p>
+                <PlaidLinkButton onSuccess={handleSuccess} />
+              </div>
+            )}
+          </>
+        )}
+
         {/* Sports Tab */}
         {tab === 'sports' && <SportsTab />}
 
@@ -394,26 +392,26 @@ export default function Home() {
         {tab === 'accounts' && (
           <>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Connected Institutions</h2>
+              <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono">Connected Institutions</h2>
               <PlaidLinkButton onSuccess={handleSuccess} label="Add Account" />
             </div>
 
             {loading && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center text-gray-400 mb-4">
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800 text-center text-zinc-500 mb-4">
                 Connecting...
               </div>
             )}
 
             {items.length === 0 && !loading && (
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 text-gray-400">
+              <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800 text-zinc-500">
                 No accounts connected yet.
               </div>
             )}
 
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={item.accessToken} className="bg-gray-900 rounded-xl border border-gray-800">
-                  <div className="flex justify-between items-center p-4 border-b border-gray-800">
+                <div key={item.accessToken} className="bg-zinc-950 rounded-xl border border-zinc-800">
+                  <div className="flex justify-between items-center p-4 border-b border-zinc-800">
                     <p className="font-semibold text-white">Institution {idx + 1}</p>
                     <button
                       onClick={() => handleRemove(item.accessToken)}
@@ -421,14 +419,14 @@ export default function Home() {
                       Remove
                     </button>
                   </div>
-                  <div className="divide-y divide-gray-800">
+                  <div className="divide-y divide-zinc-800">
                     {item.accounts.map(account => (
                       <div key={account.account_id} className="flex justify-between items-center px-4 py-3">
                         <div>
                           <p className="font-medium">{account.name}</p>
-                          <p className="text-sm text-gray-400 capitalize">{account.type} · {account.subtype}</p>
+                          <p className="text-sm text-zinc-500 capitalize">{account.type} · {account.subtype}</p>
                         </div>
-                        <p className="font-bold text-green-400">{fmt(account.balances.current)}</p>
+                        <p className="font-bold text-amber-400">{fmt(account.balances.current)}</p>
                       </div>
                     ))}
                   </div>
