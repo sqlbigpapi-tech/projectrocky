@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import BillsTab from './components/BillsTab';
+import SportsTab from './components/SportsTab';
 
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
 type Transaction = { transaction_id: string; name: string; date: string; amount: number; category?: string[] };
@@ -87,7 +88,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<'dashboard' | 'accounts' | 'bills'>('dashboard');
+  const [tab, setTab] = useState<'dashboard' | 'accounts' | 'bills' | 'sports'>('dashboard');
   const [billsDueSoon, setBillsDueSoon] = useState(0);
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -212,7 +213,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-3 mb-8">
-          {(['dashboard', 'accounts', 'bills'] as const).map(t => (
+          {(['dashboard', 'accounts', 'bills', 'sports'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`relative px-6 py-2.5 rounded-xl text-sm font-semibold transition capitalize tracking-wide ${
                 tab === t
@@ -337,6 +338,9 @@ export default function Home() {
             )}
           </>
         )}
+
+        {/* Sports Tab */}
+        {tab === 'sports' && <SportsTab />}
 
         {/* Bills Tab */}
         {tab === 'bills' && (
