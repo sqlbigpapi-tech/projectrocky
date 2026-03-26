@@ -10,7 +10,7 @@ import NewsTab from './components/NewsTab';
 import BDTargetsTab from './components/BDTargetsTab';
 
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
-type Transaction = { transaction_id: string; name: string; date: string; amount: number; category?: string[] };
+type Transaction = { transaction_id: string; account_id?: string; name: string; date: string; amount: number; category?: string[] };
 type Bill = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
 type ConnectedItem = { accessToken: string; accounts: Account[]; transactions: Transaction[]; bills: Bill[] };
 
@@ -160,7 +160,7 @@ export default function Home() {
 
   const allAccounts = items.flatMap(i => i.accounts).filter(a => !hiddenAccounts.has(a.account_id));
   const allTransactions = items.flatMap(i => i.transactions).filter(t =>
-    !hiddenAccounts.has((t as { account_id?: string }).account_id ?? '')
+    !t.account_id || !hiddenAccounts.has(t.account_id)
   );
   const allBills = items.flatMap(i => i.bills).sort((a, b) => a.daysUntil - b.daysUntil);
 

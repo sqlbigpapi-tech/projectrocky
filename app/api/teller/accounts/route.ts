@@ -76,9 +76,10 @@ export async function POST(request: Request) {
       balances: { current: parseFloat(balance?.ledger ?? '0') },
     }));
 
-    const transactions = accountData.flatMap(({ txns }) =>
+    const transactions = accountData.flatMap(({ acc, txns }) =>
       (Array.isArray(txns) ? txns : []).map(t => ({
         transaction_id: t.id,
+        account_id: acc.id,
         name: t.details?.counterparty?.name || t.description,
         date: t.date,
         // Teller: negative=debit (expense), positive=credit (income)
