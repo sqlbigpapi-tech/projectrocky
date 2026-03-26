@@ -1,6 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 
+const TOP_COMPANIES = [
+  { name: 'TD SYNNEX',              city: 'Clearwater',      industry: 'Technology',         revenue: '$57.6B' },
+  { name: 'Publix Super Markets',   city: 'Lakeland',        industry: 'Retail',             revenue: '$58.5B' },
+  { name: 'Jabil',                  city: 'St. Petersburg',  industry: 'Manufacturing',      revenue: '$34.7B' },
+  { name: 'Lennar Corporation',     city: 'Miami',           industry: 'Real Estate',        revenue: '$34.2B' },
+  { name: 'AutoNation',             city: 'Fort Lauderdale', industry: 'Retail',             revenue: '$26.1B' },
+].sort((a, b) => parseFloat(b.revenue.replace(/[^0-9.]/g, '')) - parseFloat(a.revenue.replace(/[^0-9.]/g, ''))).slice(0, 5);
+
 type BillItem = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
 type Game = {
   id: string;
@@ -181,6 +189,25 @@ export default function BriefingTab({ bills, cashFlow, monthlyIncome, monthlyExp
             ))}
           </div>
         )}
+      </div>
+
+      {/* Top FL Companies */}
+      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Top FL Companies by Revenue</p>
+        <div className="divide-y divide-zinc-800/60">
+          {TOP_COMPANIES.map((c, i) => (
+            <div key={c.name} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+              <span className={`text-xs font-bold font-mono tabular-nums w-5 shrink-0 ${i === 0 ? 'text-amber-400' : 'text-zinc-600'}`}>
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{c.name}</p>
+                <p className="text-xs text-zinc-500">{c.city} · {c.industry}</p>
+              </div>
+              <span className="text-sm font-bold text-amber-400 tabular-nums shrink-0">{c.revenue}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Sports snapshot */}
