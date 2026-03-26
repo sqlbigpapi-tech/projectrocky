@@ -288,8 +288,8 @@ export default function Home() {
                       .filter(t => {
                         if (t.amount <= 0) return false;
                         const now = new Date();
-                        const d = new Date(t.date);
-                        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                        const [year, month] = t.date.split('-').map(Number);
+                        return year === now.getFullYear() && month === now.getMonth() + 1;
                       })
                       .sort((a, b) => b.amount - a.amount)
                       .slice(0, 5)
