@@ -6,6 +6,8 @@ export type GolfPlayer = {
   score: string;
   today: string;
   rounds: string[];  // per-round to-par strings: ["-7", "-2", "-2", "-"]
+  flag?: string;     // country flag image URL
+  country?: string;  // country name
 };
 
 export type GolfData = {
@@ -51,7 +53,7 @@ export async function GET() {
         competitors: {
           order: number;
           score: string;
-          athlete: { displayName: string };
+          athlete: { displayName: string; flag?: { href: string; alt: string } };
           linescores: { displayValue: string; period: number }[];
         }[];
       }[];
@@ -74,7 +76,7 @@ export async function GET() {
 
     const raw = (comp.competitors ?? [])
       .sort((a, b) => a.order - b.order)
-      .slice(0, 20)
+      .slice(0, 5)
       .map(p => {
         const rounds = (p.linescores ?? [])
           .sort((a, b) => a.period - b.period)
@@ -90,6 +92,8 @@ export async function GET() {
           score: p.score ?? 'E',
           today,
           rounds,
+          flag: p.athlete?.flag?.href,
+          country: p.athlete?.flag?.alt,
         };
       });
 

@@ -167,9 +167,10 @@ function GolfLeaderboard() {
           {/* Column headers */}
           <div
             className="grid px-5 py-2 text-xs font-bold text-zinc-600 font-mono tracking-widest uppercase"
-            style={{ gridTemplateColumns: '3rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}
+            style={{ gridTemplateColumns: '3rem 1.5rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}
           >
             <span>POS</span>
+            <span />
             <span>PLAYER</span>
             <span className="text-right">TOTAL</span>
             {roundCols.map(r => <span key={r} className="text-right">{r}</span>)}
@@ -181,13 +182,18 @@ function GolfLeaderboard() {
               <div
                 key={i}
                 className={`grid items-center px-5 py-2.5 transition-colors hover:bg-zinc-900/30 ${i < 3 ? 'bg-zinc-900/20' : ''}`}
-                style={{ gridTemplateColumns: '3rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}
+                style={{ gridTemplateColumns: '3rem 1.5rem 1fr 3.5rem repeat(' + roundCols.length + ', 2.5rem)' }}
               >
                 <span className={`text-xs font-bold font-mono tabular-nums ${
                   i === 0 ? 'text-amber-400' : i < 3 ? 'text-zinc-300' : 'text-zinc-600'
                 }`}>
                   {player.position}
                 </span>
+                {player.flag ? (
+                  <Image src={player.flag} alt={player.country ?? ''} width={16} height={12} className="object-cover rounded-sm" unoptimized />
+                ) : (
+                  <span />
+                )}
                 <span className={`text-sm truncate pr-2 ${i < 3 ? 'font-semibold text-white' : 'text-zinc-300'}`}>
                   {player.name}
                 </span>
