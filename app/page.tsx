@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
+import TellerConnectButton from './components/TellerConnect';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import BillsTab from './components/BillsTab';
 import SportsTab from './components/SportsTab';
@@ -52,44 +52,6 @@ function SpendingChart({ transactions }: { transactions: Transaction[] }) {
   );
 }
 
-function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSuccess: (token: string) => void; label?: string }) {
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-
-  const getLinkToken = async () => {
-    const res = await fetch('/api/plaid/create-link-token', { method: 'POST' });
-    const data = await res.json();
-    setLinkToken(data.link_token);
-  };
-
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: async (public_token) => {
-      const res = await fetch('/api/plaid/exchange-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ public_token }),
-      });
-      const data = await res.json();
-      onSuccess(data.access_token);
-    },
-  });
-
-  if (!linkToken) {
-    return (
-      <button onClick={getLinkToken}
-        className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2.5 rounded-lg transition text-sm">
-        + {label}
-      </button>
-    );
-  }
-
-  return (
-    <button onClick={() => open()} disabled={!ready}
-      className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2.5 rounded-lg transition text-sm disabled:opacity-50">
-      Open Bank Login
-    </button>
-  );
-}
 
 export default function Home() {
   const [tab, setTab] = useState<'briefing' | 'dashboard' | 'accounts' | 'bills' | 'sports' | 'weather' | 'news' | 'bd'>('briefing');
@@ -101,25 +63,17 @@ export default function Home() {
   const seiLoaded = useRef(false);
 
   const fetchItem = async (token: string) => {
-    const [accountsRes, recurringRes] = await Promise.all([
-      fetch('/api/plaid/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: token }),
-      }),
-      fetch('/api/plaid/recurring', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: token, account_ids: [] }),
-      }),
-    ]);
-    const accountsData = await accountsRes.json();
-    const recurringData = await recurringRes.json();
+    const res = await fetch('/api/teller/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: token }),
+    });
+    const data = await res.json();
     setItems(prev => [...prev, {
       accessToken: token,
-      accounts: accountsData.accounts || [],
-      transactions: accountsData.transactions || [],
-      bills: recurringData.bills || [],
+      accounts: data.accounts || [],
+      transactions: data.transactions || [],
+      bills: [],
     }]);
   };
 
@@ -172,18 +126,11 @@ export default function Home() {
   };
 
   const handleRemove = async (accessToken: string) => {
-    await Promise.all([
-      fetch('/api/plaid/remove-item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken }),
-      }),
-      fetch('/api/items', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken }),
-      }),
-    ]);
+    await fetch('/api/items', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: accessToken }),
+    });
     setItems(prev => prev.filter(i => i.accessToken !== accessToken));
   };
 
@@ -375,7 +322,7 @@ export default function Home() {
               <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
                 <h2 className="text-lg font-semibold mb-2">Get Started</h2>
                 <p className="text-zinc-400 mb-4">Connect a bank account to see your finances.</p>
-                <PlaidLinkButton onSuccess={handleSuccess} />
+                <TellerConnectButton onSuccess={handleSuccess} />
               </div>
             )}
           </>
@@ -398,7 +345,7 @@ export default function Home() {
           <>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono">Connected Institutions</h2>
-              <PlaidLinkButton onSuccess={handleSuccess} label="Add Account" />
+              <TellerConnectButton onSuccess={handleSuccess} label="Add Account" />
             </div>
 
             {loading && (
