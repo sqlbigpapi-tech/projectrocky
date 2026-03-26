@@ -256,10 +256,15 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <SpendingChart transactions={allTransactions} />
                 <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
-                  <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Top 5 Purchases</h2>
+                  <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Top 5 Purchases · This Month</h2>
                   <div className="space-y-3">
                     {[...allTransactions]
-                      .filter(t => t.amount > 0)
+                      .filter(t => {
+                        if (t.amount <= 0) return false;
+                        const now = new Date();
+                        const d = new Date(t.date);
+                        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                      })
                       .sort((a, b) => b.amount - a.amount)
                       .slice(0, 5)
                       .map((t, i) => (
