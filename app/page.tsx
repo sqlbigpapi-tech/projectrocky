@@ -59,6 +59,7 @@ export default function Home() {
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [seiValue, setSeiValue] = useState<string>('');
+  const [hiddenAccounts, setHiddenAccounts] = useState<Set<string>>(new Set());
   const seiDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seiLoaded = useRef(false);
 
@@ -76,6 +77,29 @@ export default function Home() {
       bills: [],
     }]);
   };
+
+  useEffect(() => {
+    const stored = localStorage.getItem('hidden_accounts');
+    if (stored) setHiddenAccounts(new Set(JSON.parse(stored)));
+  }, []);
+
+  function hideAccount(accountId: string) {
+    setHiddenAccounts(prev => {
+      const next = new Set(prev);
+      next.add(accountId);
+      localStorage.setItem('hidden_accounts', JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function unhideAccount(accountId: string) {
+    setHiddenAccounts(prev => {
+      const next = new Set(prev);
+      next.delete(accountId);
+      localStorage.setItem('hidden_accounts', JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   useEffect(() => {
     async function loadSaved() {
@@ -134,8 +158,10 @@ export default function Home() {
     setItems(prev => prev.filter(i => i.accessToken !== accessToken));
   };
 
-  const allAccounts = items.flatMap(i => i.accounts);
-  const allTransactions = items.flatMap(i => i.transactions);
+  const allAccounts = items.flatMap(i => i.accounts).filter(a => !hiddenAccounts.has(a.account_id));
+  const allTransactions = items.flatMap(i => i.transactions).filter(t =>
+    !hiddenAccounts.has((t as { account_id?: string }).account_id ?? '')
+  );
   const allBills = items.flatMap(i => i.bills).sort((a, b) => a.daysUntil - b.daysUntil);
 
   const seiParsed = parseFloat(seiValue.replace(/,/g, '')) || 0;
@@ -377,15 +403,30 @@ export default function Home() {
                     </button>
                   </div>
                   <div className="divide-y divide-zinc-800">
-                    {item.accounts.map(account => (
-                      <div key={account.account_id} className="flex justify-between items-center px-4 py-3">
-                        <div>
-                          <p className="font-medium">{account.name}</p>
-                          <p className="text-sm text-zinc-500 capitalize">{account.type} · {account.subtype}</p>
+                    {item.accounts.map(account => {
+                      const isHidden = hiddenAccounts.has(account.account_id);
+                      return (
+                        <div key={account.account_id} className={`flex justify-between items-center px-4 py-3 ${isHidden ? 'opacity-40' : ''}`}>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium">{account.name}</p>
+                            <p className="text-sm text-zinc-500 capitalize">{account.type} · {account.subtype}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <p className="font-bold text-amber-400">{fmt(account.balances.current)}</p>
+                            <button
+                              onClick={() => isHidden ? unhideAccount(account.account_id) : hideAccount(account.account_id)}
+                              className={`text-xs px-2 py-1 rounded-lg border transition ${
+                                isHidden
+                                  ? 'text-emerald-400 border-emerald-400/30 hover:border-emerald-400/60'
+                                  : 'text-zinc-500 border-zinc-700 hover:text-red-400 hover:border-red-400/40'
+                              }`}
+                            >
+                              {isHidden ? 'Restore' : 'Remove'}
+                            </button>
+                          </div>
                         </div>
-                        <p className="font-bold text-amber-400">{fmt(account.balances.current)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
