@@ -2,7 +2,7 @@ import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } fro
 import { NextResponse } from 'next/server';
 
 const config = new Configuration({
-  basePath: PlaidEnvironments.sandbox,
+  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
   baseOptions: {
     headers: {
       'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
@@ -14,8 +14,6 @@ const config = new Configuration({
 const plaidClient = new PlaidApi(config);
 
 export async function POST() {
-  console.log('CLIENT ID:', process.env.PLAID_CLIENT_ID);
-  console.log('SECRET:', process.env.PLAID_SECRET);
   try {
     const response = await plaidClient.linkTokenCreate({
       user: { client_user_id: 'david-ortiz' },

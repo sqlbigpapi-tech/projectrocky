@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@supabase/supabase-js": "^2.99.3",
     "next": "16.2.1",
     "plaid": "^41.4.0",
