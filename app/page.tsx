@@ -8,6 +8,7 @@ import WeatherTab from './components/WeatherTab';
 import BriefingTab from './components/BriefingTab';
 import NewsTab from './components/NewsTab';
 import ClaudeTab from './components/ClaudeTab';
+import BDTargetsTab from './components/BDTargetsTab';
 
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
 type Transaction = { transaction_id: string; name: string; date: string; amount: number; category?: string[] };
@@ -92,7 +93,7 @@ function PlaidLinkButton({ onSuccess, label = 'Connect a Bank Account' }: { onSu
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<'briefing' | 'dashboard' | 'accounts' | 'bills' | 'sports' | 'weather' | 'news' | 'claude'>('briefing');
+  const [tab, setTab] = useState<'briefing' | 'dashboard' | 'accounts' | 'bills' | 'sports' | 'weather' | 'news' | 'claude' | 'bd'>('briefing');
   const [billsDueSoon, setBillsDueSoon] = useState(0);
   const [items, setItems] = useState<ConnectedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -216,6 +217,7 @@ export default function Home() {
     weather: 'WEATHER',
     news: 'NEWS',
     claude: 'CLAUDE AI',
+    bd: 'BD TARGETS',
   };
 
   return (
@@ -234,7 +236,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 flex-wrap">
-          {(['briefing', 'dashboard', 'accounts', 'bills', 'sports', 'weather', 'news', 'claude'] as const).map(t => (
+          {(['briefing', 'dashboard', 'accounts', 'bills', 'sports', 'weather', 'news', 'claude', 'bd'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`relative px-5 py-2 rounded-lg text-xs font-bold transition font-mono tracking-widest ${
                 tab === t
@@ -271,6 +273,9 @@ export default function Home() {
 
         {/* Claude AI Tab */}
         {tab === 'claude' && <ClaudeTab />}
+
+        {/* BD Targets Tab */}
+        {tab === 'bd' && <BDTargetsTab />}
 
         {/* Dashboard Tab */}
         {tab === 'dashboard' && (
