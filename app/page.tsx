@@ -10,7 +10,7 @@ import NewsTab from './components/NewsTab';
 import BDTargetsTab from './components/BDTargetsTab';
 
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
-type Transaction = { transaction_id: string; account_id?: string; name: string; date: string; amount: number; category?: string[] };
+type Transaction = { transaction_id: string; account_id?: string; name: string; date: string; amount: number; type?: string; category?: string[] };
 type Bill = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
 type ConnectedItem = { accessToken: string; accounts: Account[]; transactions: Transaction[]; bills: Bill[]; error?: string };
 
@@ -215,7 +215,11 @@ export default function Home() {
     const [y, m] = t.date.split('-').map(Number);
     return y === now.getFullYear() && m === now.getMonth() + 1;
   };
-  const isTransfer = (t: Transaction) => t.category?.[0]?.toLowerCase().includes('transfer') ?? false;
+  const isTransfer = (t: Transaction) => {
+    const type = t.type?.toLowerCase() ?? '';
+    const cat = t.category?.[0]?.toLowerCase() ?? '';
+    return type === 'transfer' || type === 'ach' || cat.includes('transfer');
+  };
   const monthlyIncome = allTransactions.filter(t => t.amount < 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + Math.abs(t.amount), 0);
   const monthlyExpenses = allTransactions.filter(t => t.amount > 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + t.amount, 0);
   const cashFlow = monthlyIncome - monthlyExpenses;

@@ -21,6 +21,7 @@ type TellerTransaction = {
   date: string;
   description: string;
   amount: string;
+  type?: string;
   details?: {
     category?: string;
     counterparty?: { name: string };
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
           name: t.details?.counterparty?.name || t.description,
           date: t.date,
           amount,
+          type: t.type,
           category: t.details?.category
             ? [t.details.category.replace(/_/g, ' ')]
             : undefined,
