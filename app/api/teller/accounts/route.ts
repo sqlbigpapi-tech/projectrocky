@@ -27,6 +27,10 @@ type TellerTransaction = {
   };
 };
 
+// Vercel stores multiline env vars with literal \n — convert to real newlines for mTLS
+const CERT = process.env.TELLER_CERT?.replace(/\\n/g, '\n');
+const KEY = process.env.TELLER_KEY?.replace(/\\n/g, '\n');
+
 function tellerGet(path: string, accessToken: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const auth = Buffer.from(`${accessToken}:`).toString('base64');
@@ -35,8 +39,8 @@ function tellerGet(path: string, accessToken: string): Promise<unknown> {
       path,
       method: 'GET',
       headers: { 'Authorization': `Basic ${auth}` },
-      cert: process.env.TELLER_CERT,
-      key: process.env.TELLER_KEY,
+      cert: CERT,
+      key: KEY,
     }, res => {
       let body = '';
       res.on('data', c => body += c);
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
 
     const accountsRaw = await tellerGet('/accounts', access_token) as TellerAccount[];
     if (!Array.isArray(accountsRaw)) {
+      console.error('TELLER /accounts not array:', JSON.stringify(accountsRaw));
       return NextResponse.json({ error: 'Failed to fetch accounts', raw: accountsRaw }, { status: 500 });
     }
 
