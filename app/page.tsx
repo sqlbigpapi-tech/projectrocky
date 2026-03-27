@@ -63,29 +63,57 @@ export default function Home() {
   const seiDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seiLoaded = useRef(false);
 
+  const cacheKey = (token: string) => `teller_cache_${token.slice(-8)}`;
+
   const fetchItem = async (token: string) => {
-    const res = await fetch('/api/teller/accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_token: token }),
-    });
-    const data = await res.json();
-    if (data.error || !data.accounts) {
-      setItems(prev => [...prev, {
-        accessToken: token,
-        accounts: [],
-        transactions: [],
-        bills: [],
-        error: 'This connection needs to be reconnected.',
-      }]);
-      return;
+    // Load cached data immediately so UI isn't blank while fetching
+    const cached = localStorage.getItem(cacheKey(token));
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setItems(prev => {
+          if (prev.some(i => i.accessToken === token)) return prev;
+          return [...prev, { ...parsed, accessToken: token }];
+        });
+      } catch { /* ignore bad cache */ }
     }
-    setItems(prev => [...prev, {
-      accessToken: token,
-      accounts: data.accounts,
-      transactions: data.transactions || [],
-      bills: [],
-    }]);
+
+    try {
+      const res = await fetch('/api/teller/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: token }),
+      });
+      const data = await res.json();
+      if (data.error || !data.accounts) {
+        // Only show error if we have no cached data to fall back on
+        setItems(prev => prev.map(i => i.accessToken === token
+          ? { ...i, error: cached ? undefined : 'This connection needs to be reconnected.' }
+          : i
+        ));
+        if (!cached) {
+          setItems(prev => {
+            if (prev.some(i => i.accessToken === token)) return prev;
+            return [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }];
+          });
+        }
+        return;
+      }
+      const item = { accounts: data.accounts, transactions: data.transactions || [], bills: [] };
+      localStorage.setItem(cacheKey(token), JSON.stringify(item));
+      setItems(prev => prev.map(i => i.accessToken === token
+        ? { ...item, accessToken: token, error: undefined }
+        : i
+      ).concat(prev.some(i => i.accessToken === token) ? [] : [{ ...item, accessToken: token }]));
+    } catch {
+      // Network error — keep cached data, don't wipe it
+      if (!cached) {
+        setItems(prev => {
+          if (prev.some(i => i.accessToken === token)) return prev;
+          return [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }];
+        });
+      }
+    }
   };
 
   useEffect(() => {
@@ -165,6 +193,7 @@ export default function Home() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ access_token: accessToken }),
     });
+    localStorage.removeItem(cacheKey(accessToken));
     setItems(prev => prev.filter(i => i.accessToken !== accessToken));
   };
 
