@@ -67,15 +67,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: msg }, { status: 500 });
     }
 
-    const accountData = await Promise.all(
-      accountsRaw.map(async acc => {
-        const [balance, txns] = await Promise.all([
-          tellerGet(`/accounts/${acc.id}/balances`, access_token),
-          tellerGet(`/accounts/${acc.id}/transactions`, access_token),
-        ]);
-        return { acc, balance: balance as TellerBalance, txns: txns as TellerTransaction[] };
-      })
-    );
+    const accountData: { acc: TellerAccount; balance: TellerBalance; txns: TellerTransaction[] }[] = [];
+    for (const acc of accountsRaw) {
+      const balance = await tellerGet(`/accounts/${acc.id}/balances`, access_token);
+      await new Promise(r => setTimeout(r, 150));
+      const txns = await tellerGet(`/accounts/${acc.id}/transactions`, access_token);
+      await new Promise(r => setTimeout(r, 150));
+      accountData.push({ acc, balance: balance as TellerBalance, txns: txns as TellerTransaction[] });
+    }
 
     const accounts = accountData.map(({ acc, balance }) => ({
       account_id: acc.id,
