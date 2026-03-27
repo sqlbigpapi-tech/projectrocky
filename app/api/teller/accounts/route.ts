@@ -77,18 +77,24 @@ export async function POST(request: Request) {
     }));
 
     const transactions = accountData.flatMap(({ acc, txns }) =>
-      (Array.isArray(txns) ? txns : []).map(t => ({
-        transaction_id: t.id,
-        account_id: acc.id,
-        name: t.details?.counterparty?.name || t.description,
-        date: t.date,
-        // Teller: negative=debit (expense), positive=credit (income)
+      (Array.isArray(txns) ? txns : []).map(t => {
+        const raw = parseFloat(t.amount);
+        // Teller sign convention differs by account type:
+        // - depository/investment: positive=credit(income), negative=debit(expense)
+        // - credit (cards): positive=charge(expense), negative=payment
         // App convention: positive=expense, negative=income
-        amount: -parseFloat(t.amount),
-        category: t.details?.category
-          ? [t.details.category.replace(/_/g, ' ')]
-          : undefined,
-      }))
+        const amount = acc.type === 'credit' ? raw : -raw;
+        return {
+          transaction_id: t.id,
+          account_id: acc.id,
+          name: t.details?.counterparty?.name || t.description,
+          date: t.date,
+          amount,
+          category: t.details?.category
+            ? [t.details.category.replace(/_/g, ' ')]
+            : undefined,
+        };
+      })
     );
 
     return NextResponse.json({ accounts, transactions });
