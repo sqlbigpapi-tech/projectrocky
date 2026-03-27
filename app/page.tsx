@@ -12,7 +12,7 @@ import BDTargetsTab from './components/BDTargetsTab';
 type Account = { account_id: string; name: string; type: string; subtype: string; balances: { current: number } };
 type Transaction = { transaction_id: string; account_id?: string; name: string; date: string; amount: number; category?: string[] };
 type Bill = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
-type ConnectedItem = { accessToken: string; accounts: Account[]; transactions: Transaction[]; bills: Bill[] };
+type ConnectedItem = { accessToken: string; accounts: Account[]; transactions: Transaction[]; bills: Bill[]; error?: string };
 
 const COLORS = ['#F59E0B','#ffffff','#EF4444','#10b981','#F97316','#a78bfa','#fb923c','#34d399'];
 
@@ -38,7 +38,7 @@ function SpendingChart({ transactions }: { transactions: Transaction[] }) {
 
   return (
     <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
-      <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Spending by Category</h2>
+      <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Spending by Category · This Month</h2>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={55}>
@@ -70,9 +70,19 @@ export default function Home() {
       body: JSON.stringify({ access_token: token }),
     });
     const data = await res.json();
+    if (data.error || !data.accounts) {
+      setItems(prev => [...prev, {
+        accessToken: token,
+        accounts: [],
+        transactions: [],
+        bills: [],
+        error: 'This connection needs to be reconnected.',
+      }]);
+      return;
+    }
     setItems(prev => [...prev, {
       accessToken: token,
-      accounts: data.accounts || [],
+      accounts: data.accounts,
       transactions: data.transactions || [],
       bills: [],
     }]);
@@ -169,8 +179,14 @@ export default function Home() {
     a.type === 'depository' || a.type === 'investment'
       ? sum + a.balances.current
       : sum - a.balances.current, 0) + seiParsed;
-  const monthlyIncome = allTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const monthlyExpenses = allTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+  const now = new Date();
+  const thisMonth = (t: Transaction) => {
+    const [y, m] = t.date.split('-').map(Number);
+    return y === now.getFullYear() && m === now.getMonth() + 1;
+  };
+  const isTransfer = (t: Transaction) => t.category?.[0]?.toLowerCase().includes('transfer') ?? false;
+  const monthlyIncome = allTransactions.filter(t => t.amount < 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const monthlyExpenses = allTransactions.filter(t => t.amount > 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + t.amount, 0);
   const cashFlow = monthlyIncome - monthlyExpenses;
 
   const metrics = [
@@ -280,13 +296,14 @@ export default function Home() {
 
             {allTransactions.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <SpendingChart transactions={allTransactions} />
+                <SpendingChart transactions={allTransactions.filter(t => thisMonth(t) && !isTransfer(t))} />
                 <div className="bg-zinc-950 rounded-xl p-6 border border-zinc-800">
                   <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono mb-4">Top 5 Purchases · This Month</h2>
                   <div className="space-y-3">
                     {[...allTransactions]
                       .filter(t => {
                         if (t.amount <= 0) return false;
+                        if (isTransfer(t)) return false;
                         const now = new Date();
                         const [year, month] = t.date.split('-').map(Number);
                         return year === now.getFullYear() && month === now.getMonth() + 1;
@@ -393,14 +410,22 @@ export default function Home() {
 
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={item.accessToken} className="bg-zinc-950 rounded-xl border border-zinc-800">
+                <div key={item.accessToken} className={`bg-zinc-950 rounded-xl border ${item.error ? 'border-red-500/30' : 'border-zinc-800'}`}>
                   <div className="flex justify-between items-center p-4 border-b border-zinc-800">
-                    <p className="font-semibold text-white">Institution {idx + 1}</p>
-                    <button
-                      onClick={() => handleRemove(item.accessToken)}
-                      className="text-sm text-red-400 hover:text-red-300 border border-red-400/30 hover:border-red-300/50 px-3 py-1 rounded-lg transition">
-                      Remove
-                    </button>
+                    <div>
+                      <p className="font-semibold text-white">Institution {idx + 1}</p>
+                      {item.error && <p className="text-xs text-red-400 mt-0.5">{item.error}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.error && (
+                        <TellerConnectButton onSuccess={handleSuccess} label="Reconnect" />
+                      )}
+                      <button
+                        onClick={() => handleRemove(item.accessToken)}
+                        className="text-sm text-red-400 hover:text-red-300 border border-red-400/30 hover:border-red-300/50 px-3 py-1 rounded-lg transition">
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <div className="divide-y divide-zinc-800">
                     {item.accounts.map(account => {
