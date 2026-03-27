@@ -88,11 +88,11 @@ export default function Home() {
       const data = await res.json();
 
       if (data.error || !data.accounts) {
-        // API failed — if no cache, show error; if cache exists, leave it alone
+        const errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error ?? data);
         if (!cached) {
           setItems(prev => prev.some(i => i.accessToken === token)
             ? prev
-            : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }]
+            : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: errMsg }]
           );
         }
         return;

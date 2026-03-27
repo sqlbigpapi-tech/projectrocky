@@ -59,8 +59,12 @@ export async function POST(request: Request) {
 
     const accountsRaw = await tellerGet('/accounts', access_token) as TellerAccount[];
     if (!Array.isArray(accountsRaw)) {
-      console.error('TELLER /accounts not array:', JSON.stringify(accountsRaw));
-      return NextResponse.json({ error: 'Failed to fetch accounts', raw: accountsRaw }, { status: 500 });
+      const tellerError = (accountsRaw as Record<string, unknown>)?.error;
+      const msg = typeof tellerError === 'object' && tellerError !== null
+        ? JSON.stringify(tellerError)
+        : 'Teller returned: ' + JSON.stringify(accountsRaw);
+      console.error('TELLER /accounts error:', msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     const accountData = await Promise.all(
