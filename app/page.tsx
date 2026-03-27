@@ -219,7 +219,14 @@ export default function Home() {
   const isTransfer = (t: Transaction) => {
     const type = t.type?.toLowerCase() ?? '';
     const cat = t.category?.[0]?.toLowerCase() ?? '';
-    return type === 'transfer' || type === 'ach' || cat.includes('transfer');
+    const name = t.name?.toLowerCase() ?? '';
+    return type === 'transfer' || type === 'ach' || type === 'wire'
+      || cat.includes('transfer')
+      || name.startsWith('online transfer')
+      || name.startsWith('transfer to')
+      || name.startsWith('transfer from')
+      || name.includes('online transfer to')
+      || name.includes('online transfer from');
   };
   const monthlyIncome = allTransactions.filter(t => t.amount < 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + Math.abs(t.amount), 0);
   const monthlyExpenses = allTransactions.filter(t => t.amount > 0 && thisMonth(t) && !isTransfer(t)).reduce((sum, t) => sum + t.amount, 0);
