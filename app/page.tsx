@@ -66,15 +66,15 @@ export default function Home() {
   const cacheKey = (token: string) => `teller_cache_${token.slice(-8)}`;
 
   const fetchItem = async (token: string) => {
-    // Load cached data immediately so UI isn't blank while fetching
+    // Show cached data instantly while fresh data loads in background
     const cached = localStorage.getItem(cacheKey(token));
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        setItems(prev => {
-          if (prev.some(i => i.accessToken === token)) return prev;
-          return [...prev, { ...parsed, accessToken: token }];
-        });
+        setItems(prev => prev.some(i => i.accessToken === token)
+          ? prev
+          : [...prev, { ...parsed, accessToken: token }]
+        );
       } catch { /* ignore bad cache */ }
     }
 
@@ -85,33 +85,35 @@ export default function Home() {
         body: JSON.stringify({ access_token: token }),
       });
       const data = await res.json();
+
       if (data.error || !data.accounts) {
-        // Only show error if we have no cached data to fall back on
-        setItems(prev => prev.map(i => i.accessToken === token
-          ? { ...i, error: cached ? undefined : 'This connection needs to be reconnected.' }
-          : i
-        ));
+        // API failed — if no cache, show error; if cache exists, leave it alone
         if (!cached) {
-          setItems(prev => {
-            if (prev.some(i => i.accessToken === token)) return prev;
-            return [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }];
-          });
+          setItems(prev => prev.some(i => i.accessToken === token)
+            ? prev
+            : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }]
+          );
         }
         return;
       }
+
+      // Success — update cache and state
       const item = { accounts: data.accounts, transactions: data.transactions || [], bills: [] };
       localStorage.setItem(cacheKey(token), JSON.stringify(item));
-      setItems(prev => prev.map(i => i.accessToken === token
-        ? { ...item, accessToken: token, error: undefined }
-        : i
-      ).concat(prev.some(i => i.accessToken === token) ? [] : [{ ...item, accessToken: token }]));
+      setItems(prev => {
+        const exists = prev.some(i => i.accessToken === token);
+        if (exists) {
+          return prev.map(i => i.accessToken === token ? { ...item, accessToken: token, error: undefined } : i);
+        }
+        return [...prev, { ...item, accessToken: token }];
+      });
     } catch {
-      // Network error — keep cached data, don't wipe it
+      // Network error — keep cached data or show error if nothing cached
       if (!cached) {
-        setItems(prev => {
-          if (prev.some(i => i.accessToken === token)) return prev;
-          return [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }];
-        });
+        setItems(prev => prev.some(i => i.accessToken === token)
+          ? prev
+          : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }]
+        );
       }
     }
   };
