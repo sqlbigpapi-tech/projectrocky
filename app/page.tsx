@@ -108,12 +108,12 @@ export default function Home() {
         }
         return [...prev, { ...item, accessToken: token }];
       });
-    } catch {
-      // Network error — keep cached data or show error if nothing cached
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Network error';
       if (!cached) {
         setItems(prev => prev.some(i => i.accessToken === token)
           ? prev
-          : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: 'This connection needs to be reconnected.' }]
+          : [...prev, { accessToken: token, accounts: [], transactions: [], bills: [], error: errMsg }]
         );
       }
     }
