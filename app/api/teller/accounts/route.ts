@@ -27,9 +27,8 @@ type TellerTransaction = {
   };
 };
 
-// Vercel stores multiline env vars with literal \n — convert to real newlines for mTLS
-const CERT = process.env.TELLER_CERT?.replace(/\\n/g, '\n');
-const KEY = process.env.TELLER_KEY?.replace(/\\n/g, '\n');
+const CERT = process.env.TELLER_CERT;
+const KEY = process.env.TELLER_KEY;
 
 function tellerGet(path: string, accessToken: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
