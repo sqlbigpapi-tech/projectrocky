@@ -63,7 +63,8 @@ export default function Home() {
   const seiDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seiLoaded = useRef(false);
 
-  const cacheKey = (token: string) => `teller_cache_${token.slice(-8)}`;
+  const CACHE_VERSION = 'v2'; // bump to invalidate stale caches
+  const cacheKey = (token: string) => `teller_cache_${CACHE_VERSION}_${token.slice(-8)}`;
 
   const fetchItem = async (token: string) => {
     // Show cached data instantly while fresh data loads in background
@@ -428,7 +429,24 @@ export default function Home() {
           <>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono">Connected Institutions</h2>
-              <TellerConnectButton onSuccess={handleSuccess} label="Add Account" />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    // Clear all teller caches and re-fetch
+                    Object.keys(localStorage).filter(k => k.startsWith('teller_cache_')).forEach(k => localStorage.removeItem(k));
+                    setItems([]);
+                    setLoading(true);
+                    const res = await fetch('/api/items');
+                    const { items: tokens } = await res.json();
+                    if (tokens?.length) await Promise.all(tokens.map((t: string) => fetchItem(t)));
+                    setLoading(false);
+                  }}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-4 py-2 rounded-lg transition text-sm"
+                >
+                  Refresh
+                </button>
+                <TellerConnectButton onSuccess={handleSuccess} label="Add Account" />
+              </div>
             </div>
 
             {loading && (
