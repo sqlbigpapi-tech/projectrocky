@@ -9,7 +9,6 @@ const TOP_COMPANIES = [
   { name: 'AutoNation',             city: 'Fort Lauderdale', industry: 'Retail',             revenue: '$26.1B' },
 ].sort((a, b) => parseFloat(b.revenue.replace(/[^0-9.]/g, '')) - parseFloat(a.revenue.replace(/[^0-9.]/g, ''))).slice(0, 5);
 
-type BillItem = { name: string; amount: number; nextDate: string; daysUntil: number; frequency: string };
 type Game = {
   id: string;
   league: string;
@@ -20,17 +19,17 @@ type Game = {
 };
 type WeatherCurrent = { temp: number; feelsLike: number; condition: string; code: number; windSpeed: number; windDir: string; humidity: number };
 
-type Props = {
-  bills: BillItem[];
-  cashFlow: number;
-  monthlyIncome: number;
-  monthlyExpenses: number;
-  netWorth: number;
-  hasAccounts: boolean;
-};
+const FAVORITES = [
+  { name: 'Mets' },
+  { name: 'Giants', league: 'NFL' },
+  { name: 'Knicks' },
+];
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+function isFavorite(team: { name: string; abbr: string }, league: string) {
+  return FAVORITES.some(f =>
+    (team.name.includes(f.name) || team.abbr.includes(f.name.toUpperCase())) &&
+    (!('league' in f) || (f as { name: string; league: string }).league === league)
+  );
 }
 
 function weatherIcon(code: number): string {
@@ -47,20 +46,7 @@ function weatherIcon(code: number): string {
   return '🌡️';
 }
 
-const FAVORITES = [
-  { name: 'Mets' },
-  { name: 'Giants', league: 'NFL' },
-  { name: 'Knicks' },
-];
-
-function isFavorite(team: { name: string; abbr: string }, league: string) {
-  return FAVORITES.some(f =>
-    (team.name.includes(f.name) || team.abbr.includes(f.name.toUpperCase())) &&
-    (!('league' in f) || (f as { name: string; league: string }).league === league)
-  );
-}
-
-export default function BriefingTab({ bills, cashFlow, monthlyIncome, monthlyExpenses, netWorth, hasAccounts }: Props) {
+export default function BriefingTab() {
   const [weather, setWeather] = useState<WeatherCurrent | null>(null);
   const [scores, setScores] = useState<{ nfl: Game[]; nba: Game[]; mlb: Game[] } | null>(null);
   const [now, setNow] = useState(new Date());
@@ -77,8 +63,6 @@ export default function BriefingTab({ bills, cashFlow, monthlyIncome, monthlyExp
 
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-  const billsDueThisWeek = bills.filter(b => b.daysUntil >= 0 && b.daysUntil <= 7);
 
   const allGames = scores ? [...scores.nfl, ...scores.nba, ...scores.mlb] : [];
   const finalGames = allGames.filter(g => g.status === 'final');
@@ -104,110 +88,21 @@ export default function BriefingTab({ bills, cashFlow, monthlyIncome, monthlyExp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Weather snapshot */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Weather · Parkland, FL</p>
-          {weather ? (
-            <div className="flex items-center gap-4">
-              <span className="text-4xl">{weatherIcon(weather.code)}</span>
-              <div>
-                <p className="text-3xl font-bold text-white tabular-nums">{weather.temp}°F</p>
-                <p className="text-sm text-zinc-400">{weather.condition}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">Feels like {weather.feelsLike}° · {weather.windSpeed}mph {weather.windDir}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="h-16 bg-zinc-900 rounded-lg animate-pulse" />
-          )}
-        </div>
-
-        {/* Cash flow status */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Cash Flow</p>
-          {hasAccounts ? (
-            <div>
-              <p className={`text-3xl font-bold tabular-nums ${cashFlow >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {cashFlow >= 0 ? '+' : ''}{fmt(cashFlow)}
-              </p>
-              <p className="text-xs text-zinc-600 mt-1">
-                {fmt(monthlyIncome)} in · {fmt(monthlyExpenses)} out
-              </p>
-              <p className={`text-xs mt-2 font-medium ${cashFlow >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                {cashFlow >= 0 ? '▲ Positive this month' : '▼ Running a deficit'}
-              </p>
-            </div>
-          ) : (
-            <p className="text-zinc-600 text-sm">No accounts connected</p>
-          )}
-        </div>
-
-        {/* Net worth */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Net Worth</p>
-          {hasAccounts ? (
-            <div>
-              <p className="text-3xl font-bold text-amber-400 tabular-nums">{fmt(netWorth)}</p>
-              <p className="text-xs text-zinc-600 mt-1">All accounts + SEI</p>
-            </div>
-          ) : (
-            <p className="text-zinc-600 text-sm">No accounts connected</p>
-          )}
-        </div>
-      </div>
-
-      {/* Bills due this week */}
+      {/* Weather snapshot */}
       <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">
-          Bills This Week
-          {billsDueThisWeek.length > 0 && (
-            <span className="ml-2 bg-yellow-500/15 text-yellow-400 text-xs px-2 py-0.5 rounded-full border border-yellow-500/25">
-              {billsDueThisWeek.length} due
-            </span>
-          )}
-        </p>
-        {billsDueThisWeek.length === 0 ? (
-          <p className="text-zinc-600 text-sm">No bills due in the next 7 days.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {billsDueThisWeek.map((bill, i) => (
-              <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg border ${
-                bill.daysUntil === 0
-                  ? 'bg-red-500/10 border-red-500/30'
-                  : bill.daysUntil <= 3
-                  ? 'bg-yellow-500/10 border-yellow-500/20'
-                  : 'bg-zinc-900/60 border-zinc-700'
-              }`}>
-                <div>
-                  <p className="text-sm font-medium text-white">{bill.name}</p>
-                  <p className="text-xs text-zinc-500">
-                    {bill.daysUntil === 0 ? 'DUE TODAY' : `in ${bill.daysUntil}d`} · {bill.nextDate}
-                  </p>
-                </div>
-                <p className="text-sm font-bold text-red-400 tabular-nums">{fmt(bill.amount)}</p>
-              </div>
-            ))}
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Weather · Parkland, FL</p>
+        {weather ? (
+          <div className="flex items-center gap-4">
+            <span className="text-4xl">{weatherIcon(weather.code)}</span>
+            <div>
+              <p className="text-3xl font-bold text-white tabular-nums">{weather.temp}°F</p>
+              <p className="text-sm text-zinc-400">{weather.condition}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">Feels like {weather.feelsLike}° · {weather.windSpeed}mph {weather.windDir}</p>
+            </div>
           </div>
+        ) : (
+          <div className="h-16 bg-zinc-900 rounded-lg animate-pulse" />
         )}
-      </div>
-
-      {/* Top FL Companies */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Top FL Companies by Revenue</p>
-        <div className="divide-y divide-zinc-800/60">
-          {TOP_COMPANIES.map((c, i) => (
-            <div key={c.name} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-              <span className={`text-xs font-bold font-mono tabular-nums w-5 shrink-0 ${i === 0 ? 'text-amber-400' : 'text-zinc-600'}`}>
-                {i + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{c.name}</p>
-                <p className="text-xs text-zinc-500">{c.city} · {c.industry}</p>
-              </div>
-              <span className="text-sm font-bold text-amber-400 tabular-nums shrink-0">{c.revenue}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Sports snapshot */}
@@ -254,6 +149,25 @@ export default function BriefingTab({ bills, cashFlow, monthlyIncome, monthlyExp
             })}
           </div>
         )}
+      </div>
+
+      {/* Top FL Companies */}
+      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Top FL Companies by Revenue</p>
+        <div className="divide-y divide-zinc-800/60">
+          {TOP_COMPANIES.map((c, i) => (
+            <div key={c.name} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+              <span className={`text-xs font-bold font-mono tabular-nums w-5 shrink-0 ${i === 0 ? 'text-amber-400' : 'text-zinc-600'}`}>
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{c.name}</p>
+                <p className="text-xs text-zinc-500">{c.city} · {c.industry}</p>
+              </div>
+              <span className="text-sm font-bold text-amber-400 tabular-nums shrink-0">{c.revenue}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
