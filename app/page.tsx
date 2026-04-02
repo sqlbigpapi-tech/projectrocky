@@ -8,7 +8,7 @@ import BDTargetsTab from './components/BDTargetsTab';
 import TasksTab from './components/TasksTab';
 
 export default function Home() {
-  const [tab, setTab] = useState<'briefing' | 'sports' | 'weather' | 'news' | 'bd' | 'tasks'>('sports');
+  const [tab, setTab] = useState<'briefing' | 'sports' | 'weather' | 'news' | 'bd' | 'tasks'>('briefing');
 
   const TAB_LABELS: Record<string, string> = {
     briefing: 'BRIEFING',
