@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "David Home Base",
-  description: "David's personal home base — sports, news, tasks, and more",
+  title: "Ortiz OS",
+  description: "Ortiz OS — sports, news, tasks, and more",
 };
 
 export default function RootLayout({

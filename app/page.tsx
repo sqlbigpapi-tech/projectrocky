@@ -25,8 +25,8 @@ export default function Home() {
         {/* Header */}
         <div className="flex justify-between items-start mb-8 pb-6 border-b border-zinc-800">
           <div>
-            <p className="text-xs text-amber-400 uppercase tracking-[0.3em] font-mono mb-1">David</p>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Home Base</h1>
+            <p className="text-xs text-amber-400 uppercase tracking-[0.3em] font-mono mb-1">Ortiz</p>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Ortiz OS</h1>
           </div>
           <div className="text-right">
             <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono">Parkland, FL</p>
