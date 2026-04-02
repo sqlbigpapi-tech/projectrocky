@@ -132,7 +132,7 @@ export default function BriefingTab() {
       {/* ── Hero: Date + Weather ── */}
       <div className="rounded-2xl border border-amber-600/20 overflow-hidden bg-gradient-to-br from-amber-950/30 via-zinc-950 to-zinc-950">
         <div className="p-6 md:p-8">
-          <p className="text-xs text-amber-400/70 uppercase tracking-[0.3em] font-mono mb-4">Daily Briefing</p>
+          <p className="text-xs text-amber-400/70 uppercase tracking-[0.3em] font-mono mb-4">Home Base · Daily Briefing</p>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             {/* Date + greeting */}
             <div>
