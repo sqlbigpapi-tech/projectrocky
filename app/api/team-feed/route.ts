@@ -75,6 +75,30 @@ export async function GET(request: Request) {
       };
     }
 
+    // For MLB, fetch probable pitchers from game summary endpoint
+    let mlbProbables: { ours: string | null; theirs: string | null } | null = null;
+    if (league === 'mlb' && nextEvent) {
+      try {
+        const summaryRes = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${nextEvent.id}`,
+          { next: { revalidate: 1800 } }
+        );
+        const summaryData = await summaryRes.json();
+        const probables: any[] = summaryData.gameInfo?.probables ?? summaryData.probables ?? [];
+        if (probables.length > 0) {
+          const ourP = probables.find((p: any) => str(p.team?.id) === teamId);
+          const oppP = probables.find((p: any) => str(p.team?.id) !== teamId);
+          mlbProbables = {
+            ours: str(ourP?.athlete?.displayName) || null,
+            theirs: str(oppP?.athlete?.displayName) || null,
+          };
+        }
+      } catch { /* ignore, not critical */ }
+    }
+
+    const nextGame = parseGame(nextEvent);
+    if (nextGame && mlbProbables) nextGame.probablePitchers = mlbProbables;
+
     const news = (newsData.articles ?? [])
       .filter((a: any) => ['Media', 'Recap', 'Story'].includes(a.type))
       .slice(0, 4)
@@ -97,7 +121,7 @@ export async function GET(request: Request) {
       },
       liveGame: parseGame(liveEvent),
       lastGame: parseGame(lastEvent),
-      nextGame: parseGame(nextEvent),
+      nextGame,
       news,
     });
   } catch {
