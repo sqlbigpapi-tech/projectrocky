@@ -5,9 +5,10 @@ import SportsTab from './components/SportsTab';
 import WeatherTab from './components/WeatherTab';
 import NewsTab from './components/NewsTab';
 import BDTargetsTab from './components/BDTargetsTab';
+import TasksTab from './components/TasksTab';
 
 export default function Home() {
-  const [tab, setTab] = useState<'briefing' | 'sports' | 'weather' | 'news' | 'bd'>('sports');
+  const [tab, setTab] = useState<'briefing' | 'sports' | 'weather' | 'news' | 'bd' | 'tasks'>('sports');
 
   const TAB_LABELS: Record<string, string> = {
     briefing: 'BRIEFING',
@@ -15,6 +16,7 @@ export default function Home() {
     weather: 'WEATHER',
     news: 'NEWS',
     bd: 'BD TARGETS',
+    tasks: 'TASKS',
   };
 
   return (
@@ -33,7 +35,7 @@ export default function Home() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 flex-wrap">
-          {(['briefing', 'sports', 'weather', 'news', 'bd'] as const).map(t => (
+          {(['briefing', 'sports', 'weather', 'news', 'bd', 'tasks'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-5 py-2 rounded-lg text-xs font-bold transition font-mono tracking-widest ${
                 tab === t
@@ -50,6 +52,7 @@ export default function Home() {
         {tab === 'weather' && <WeatherTab />}
         {tab === 'news' && <NewsTab />}
         {tab === 'bd' && <BDTargetsTab />}
+        {tab === 'tasks' && <TasksTab />}
       </div>
     </main>
   );
