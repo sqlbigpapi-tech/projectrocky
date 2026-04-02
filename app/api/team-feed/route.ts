@@ -36,6 +36,15 @@ export async function GET(request: Request) {
     const futureGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'pre');
     const nextEvent = futureGames[0] ?? null;
 
+    function str(val: any): string {
+      if (!val) return '';
+      if (typeof val === 'string') return val;
+      if (typeof val === 'number') return String(val);
+      if (val.displayValue) return val.displayValue;
+      if (val.value) return String(val.value);
+      return '';
+    }
+
     function parseGame(event: any) {
       if (!event) return null;
       const comp = event.competitions[0];
@@ -46,19 +55,19 @@ export async function GET(request: Request) {
       const oppProbable = probables.find((p: any) => p.homeAway !== ourComp?.homeAway);
 
       return {
-        date: event.date,
-        opponent: oppComp?.team?.displayName ?? '',
-        opponentAbbr: oppComp?.team?.abbreviation ?? '',
-        opponentLogo: oppComp?.team?.logo ?? '',
-        homeAway: ourComp?.homeAway ?? 'home',
-        teamScore: ourComp?.score ?? '',
-        opponentScore: oppComp?.score ?? '',
+        date: str(event.date),
+        opponent: str(oppComp?.team?.displayName),
+        opponentAbbr: str(oppComp?.team?.abbreviation),
+        opponentLogo: str(oppComp?.team?.logo),
+        homeAway: str(ourComp?.homeAway) || 'home',
+        teamScore: str(ourComp?.score),
+        opponentScore: str(oppComp?.score),
         result: ourComp?.winner ? 'W' : oppComp?.winner ? 'L' : null,
-        statusDetail: comp.status?.type?.shortDetail ?? '',
-        venue: comp.venue?.fullName ?? '',
+        statusDetail: str(comp.status?.type?.shortDetail),
+        venue: str(comp.venue?.fullName),
         probablePitchers: probables.length > 0 ? {
-          ours: ourProbable?.athlete?.displayName ?? null,
-          theirs: oppProbable?.athlete?.displayName ?? null,
+          ours: str(ourProbable?.athlete?.displayName) || null,
+          theirs: str(oppProbable?.athlete?.displayName) || null,
         } : null,
       };
     }
@@ -77,10 +86,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       team: {
-        id: team.id,
-        name: team.displayName,
-        abbr: team.abbreviation,
-        logo: team.logo ?? team.logos?.[0]?.href ?? '',
+        id: str(team.id),
+        name: str(team.displayName),
+        abbr: str(team.abbreviation),
+        logo: str(team.logo ?? team.logos?.[0]?.href),
         league: leagueLabel(sport, league),
       },
       lastGame: parseGame(lastEvent),
