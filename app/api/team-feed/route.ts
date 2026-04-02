@@ -33,6 +33,9 @@ export async function GET(request: Request) {
     const pastGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'post');
     const lastEvent = pastGames[pastGames.length - 1] ?? null;
 
+    const liveGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'in');
+    const liveEvent = liveGames[0] ?? null;
+
     const futureGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'pre');
     const nextEvent = futureGames[0] ?? null;
 
@@ -92,6 +95,7 @@ export async function GET(request: Request) {
         logo: str(team.logo ?? team.logos?.[0]?.href),
         league: leagueLabel(sport, league),
       },
+      liveGame: parseGame(liveEvent),
       lastGame: parseGame(lastEvent),
       nextGame: parseGame(nextEvent),
       news,

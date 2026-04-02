@@ -22,6 +22,7 @@ type NewsItem = { id: string; type: string; headline: string; image: string; lin
 
 type TeamFeed = {
   team: { id: string; name: string; abbr: string; logo: string; league: string };
+  liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
   news: NewsItem[];
@@ -93,7 +94,7 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
     );
   }
 
-  const { team, lastGame, nextGame, news } = feed;
+  const { team, liveGame, lastGame, nextGame, news } = feed;
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
 
   return (
@@ -117,8 +118,33 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
       </div>
 
       <div className="divide-y divide-zinc-800/60">
+        {/* Live game */}
+        {liveGame && (
+          <div className="px-5 py-3 bg-green-500/5 border-b border-green-500/20">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <p className="text-xs text-green-400 uppercase tracking-widest font-mono font-bold">Live · {liveGame.statusDetail}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {liveGame.opponentLogo && (
+                  <div className="w-6 h-6 relative shrink-0">
+                    <Image src={liveGame.opponentLogo} alt={liveGame.opponentAbbr} fill className="object-contain" unoptimized />
+                  </div>
+                )}
+                <p className="text-sm text-zinc-300">
+                  {liveGame.homeAway === 'home' ? 'vs' : '@'} {liveGame.opponentAbbr}
+                </p>
+              </div>
+              <p className="text-lg font-bold tabular-nums text-white">
+                {liveGame.teamScore}–{liveGame.opponentScore}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Last game */}
-        {lastGame && (
+        {!liveGame && lastGame && (
           <div className="px-5 py-3">
             <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Last Game</p>
             <div className="flex items-center justify-between">
