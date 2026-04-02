@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
 
+// MLB Stats API team IDs (keyed by ESPN abbreviation)
+const MLB_TEAM_IDS: Record<string, number> = {
+  NYM: 121, NYY: 147, BOS: 111, LAD: 119, SF: 137, CHC: 112, STL: 138,
+  ATL: 144, HOU: 117, OAK: 133, SEA: 136, MIA: 146, PHI: 143, SD: 135,
+  COL: 115, ARI: 109, MIL: 158, PIT: 134, CIN: 113, WSH: 120, BAL: 110,
+  TB: 139, TOR: 141, MIN: 142, CLE: 114, DET: 116, CWS: 145, KC: 118,
+  TEX: 140, LAA: 108,
+};
+
 function leagueLabel(sport: string, league: string): string {
   if (league === 'nfl') return 'NFL';
   if (league === 'nba') return 'NBA';
@@ -75,25 +84,33 @@ export async function GET(request: Request) {
       };
     }
 
-    // For MLB, fetch probable pitchers from game summary endpoint
+    // For MLB, fetch probable pitchers from MLB Stats API
     let mlbProbables: { ours: string | null; theirs: string | null } | null = null;
-    if (league === 'mlb' && nextEvent) {
+    if (league === 'mlb') {
       try {
-        const summaryRes = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${nextEvent.id}`,
-          { next: { revalidate: 1800 } }
-        );
-        const summaryData = await summaryRes.json();
-        const probables: any[] = summaryData.gameInfo?.probables ?? summaryData.probables ?? [];
-        if (probables.length > 0) {
-          const ourP = probables.find((p: any) => str(p.team?.id) === teamId);
-          const oppP = probables.find((p: any) => str(p.team?.id) !== teamId);
-          mlbProbables = {
-            ours: str(ourP?.athlete?.displayName) || null,
-            theirs: str(oppP?.athlete?.displayName) || null,
-          };
+        const abbr = str(team.abbreviation).toUpperCase();
+        const mlbTeamId = MLB_TEAM_IDS[abbr];
+        if (mlbTeamId) {
+          const today = new Date().toISOString().split('T')[0];
+          const futureDate = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+          const mlbRes = await fetch(
+            `https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${mlbTeamId}&startDate=${today}&endDate=${futureDate}&hydrate=probablePitcher`,
+            { next: { revalidate: 1800 } }
+          );
+          const mlbData = await mlbRes.json();
+          const nextMLBGame = mlbData.dates?.[0]?.games?.[0];
+          if (nextMLBGame) {
+            const home = nextMLBGame.teams.home;
+            const away = nextMLBGame.teams.away;
+            const ourSide = home.team.id === mlbTeamId ? home : away;
+            const oppSide = home.team.id === mlbTeamId ? away : home;
+            mlbProbables = {
+              ours: ourSide.probablePitcher?.fullName ?? null,
+              theirs: oppSide.probablePitcher?.fullName ?? null,
+            };
+          }
         }
-      } catch { /* ignore, not critical */ }
+      } catch { /* not critical */ }
     }
 
     const nextGame = parseGame(nextEvent);
