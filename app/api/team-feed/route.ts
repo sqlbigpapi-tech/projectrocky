@@ -42,6 +42,20 @@ export async function GET(request: Request) {
     const pastGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'post');
     const lastEvent = pastGames[pastGames.length - 1] ?? null;
 
+    // Calculate record from completed games
+    let wins = 0, losses = 0;
+    for (const e of pastGames) {
+      const comp = e.competitions[0];
+      const ourComp = comp?.competitors?.find((c: any) => c.team.id === teamId);
+      if (ourComp?.winner === true) wins++;
+      else if (ourComp?.winner === false) losses++;
+    }
+    // Prefer ESPN's record summary if available (covers full season)
+    const espnRecord = team.record?.items?.find((r: any) => r.type === 'total')?.summary
+      ?? team.record?.items?.[0]?.summary
+      ?? null;
+    const record = espnRecord ?? (pastGames.length > 0 ? `${wins}-${losses}` : null);
+
     const liveGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'in');
     const liveEvent = liveGames[0] ?? null;
 
@@ -135,6 +149,7 @@ export async function GET(request: Request) {
         abbr: str(team.abbreviation),
         logo: str(team.logo ?? team.logos?.[0]?.href),
         league: leagueLabel(sport, league),
+        record,
       },
       liveGame: parseGame(liveEvent),
       lastGame: parseGame(lastEvent),

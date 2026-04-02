@@ -21,7 +21,7 @@ type GameInfo = {
 type NewsItem = { id: string; type: string; headline: string; image: string; link: string; published: string };
 
 type TeamFeed = {
-  team: { id: string; name: string; abbr: string; logo: string; league: string };
+  team: { id: string; name: string; abbr: string; logo: string; league: string; record: string | null };
   liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
@@ -108,7 +108,12 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
             </div>
           )}
           <div>
-            <p className="text-sm font-bold text-white">{team.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-white">{team.name}</p>
+              {team.record && (
+                <span className="text-xs text-zinc-500 font-mono tabular-nums">{team.record}</span>
+              )}
+            </div>
             <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
               {team.league}
             </span>
