@@ -107,14 +107,20 @@ export default function BriefingTab() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const weekFromNow = new Date(today.getTime() + 7 * 86400000);
   const openTasks = tasks.filter(t => !t.completed);
-  const overdueTasks = openTasks.filter(t => t.due_date && new Date(t.due_date + 'T00:00:00') < today);
-  const dueTodayTasks = openTasks.filter(t => {
-    if (!t.due_date) return false;
-    const d = new Date(t.due_date + 'T00:00:00');
-    return d.getTime() === today.getTime();
-  });
-  const urgentTasks = [...overdueTasks, ...dueTodayTasks].slice(0, 4);
+  const upcomingTasks = openTasks
+    .filter(t => t.due_date && new Date(t.due_date + 'T00:00:00') <= weekFromNow)
+    .sort((a, b) => new Date(a.due_date! + 'T00:00:00').getTime() - new Date(b.due_date! + 'T00:00:00').getTime());
+
+  function taskDueLabel(due: string): { text: string; color: string } {
+    const d = new Date(due + 'T00:00:00');
+    const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+    if (diff < 0) return { text: 'Overdue', color: 'text-red-400' };
+    if (diff === 0) return { text: 'Today', color: 'text-yellow-400' };
+    if (diff === 1) return { text: 'Tomorrow', color: 'text-amber-400' };
+    return { text: `In ${diff}d`, color: 'text-zinc-500' };
+  }
 
   const topNews = news.slice(0, 4);
 
@@ -173,44 +179,33 @@ export default function BriefingTab() {
         {/* Tasks */}
         <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Tasks</p>
-            <div className="flex items-center gap-2">
-              {overdueTasks.length > 0 && (
-                <span className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full font-mono">
-                  {overdueTasks.length} overdue
-                </span>
-              )}
-              <span className="text-xs text-zinc-600 font-mono">{openTasks.length} open</span>
-            </div>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Due This Week</p>
+            <span className="text-xs text-zinc-600 font-mono">{openTasks.length} open total</span>
           </div>
 
-          {urgentTasks.length === 0 ? (
+          {upcomingTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 gap-2">
               <p className="text-2xl">✓</p>
-              <p className="text-sm text-zinc-500">You're all clear today.</p>
+              <p className="text-sm text-zinc-500">Nothing due this week.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {urgentTasks.map(task => {
-                const d = task.due_date ? new Date(task.due_date + 'T00:00:00') : null;
-                const isOverdue = d && d < today;
+              {upcomingTasks.map(task => {
+                const label = taskDueLabel(task.due_date!);
+                const isOverdue = label.text === 'Overdue';
+                const isToday = label.text === 'Today';
                 return (
                   <div key={task.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${
-                    isOverdue ? 'bg-red-500/5 border-red-500/20' : 'bg-zinc-900/50 border-zinc-800'
+                    isOverdue ? 'bg-red-500/5 border-red-500/20' :
+                    isToday ? 'bg-yellow-500/5 border-yellow-500/20' :
+                    'bg-zinc-900/50 border-zinc-800'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_DOT[task.priority] ?? 'bg-zinc-500'}`} />
                     <p className="text-sm text-zinc-200 flex-1 truncate">{task.title}</p>
-                    <span className={`text-xs font-mono shrink-0 ${isOverdue ? 'text-red-400' : 'text-zinc-600'}`}>
-                      {isOverdue ? 'overdue' : 'today'}
-                    </span>
+                    <span className={`text-xs font-mono shrink-0 ${label.color}`}>{label.text}</span>
                   </div>
                 );
               })}
-              {openTasks.length > urgentTasks.length && (
-                <p className="text-xs text-zinc-600 font-mono pt-1 text-right">
-                  +{openTasks.length - urgentTasks.length} more open
-                </p>
-              )}
             </div>
           )}
         </div>
