@@ -1,213 +1,54 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import type { StandingsData, Standing } from '../api/standings/route';
-import type { Highlight } from '../api/highlights/route';
 
-type Team = { name: string; abbr: string; score: string; logo: string };
-type Game = {
-  id: string;
-  league: string;
+type FollowedTeam = { sport: string; league: string; teamId: string };
+
+type GameInfo = {
   date: string;
-  homeTeam: Team;
-  awayTeam: Team;
-  status: 'live' | 'final' | 'scheduled';
+  opponent: string;
+  opponentAbbr: string;
+  opponentLogo: string;
+  homeAway: string;
+  teamScore: string;
+  opponentScore: string;
+  result: 'W' | 'L' | null;
   statusDetail: string;
+  venue: string;
+  probablePitchers: { ours: string | null; theirs: string | null } | null;
 };
 
-type Scores = { nfl: Game[]; nba: Game[]; mlb: Game[] };
+type NewsItem = { id: string; type: string; headline: string; image: string; link: string; published: string };
 
-const LEAGUES = ['All', 'NFL', 'NBA', 'MLB'] as const;
-type LeagueFilter = typeof LEAGUES[number];
+type TeamFeed = {
+  team: { id: string; name: string; abbr: string; logo: string; league: string };
+  lastGame: GameInfo | null;
+  nextGame: GameInfo | null;
+  news: NewsItem[];
+};
 
-type FavoriteRule = { name: string; league?: string };
-const FAVORITES: FavoriteRule[] = [
-  { name: 'Mets' },
-  { name: 'Giants', league: 'NFL' },
-  { name: 'Knicks' },
+const LEAGUE_OPTIONS = [
+  { sport: 'football', league: 'nfl', label: 'NFL' },
+  { sport: 'basketball', league: 'nba', label: 'NBA' },
+  { sport: 'baseball', league: 'mlb', label: 'MLB' },
+  { sport: 'football', league: 'college-football', label: 'NCAAF' },
 ];
 
-function isFavorite(team: Team, league: string) {
-  return FAVORITES.some(f =>
-    (team.name.includes(f.name) || team.abbr.includes(f.name.toUpperCase())) &&
-    (!f.league || f.league === league)
-  );
-}
-
 const LEAGUE_COLORS: Record<string, string> = {
-  NFL: 'text-red-400',
-  NBA: 'text-orange-400',
-  MLB: 'text-blue-400',
+  NFL:   'text-red-400 bg-red-500/10 border-red-500/25',
+  NBA:   'text-orange-400 bg-orange-500/10 border-orange-500/25',
+  MLB:   'text-blue-400 bg-blue-500/10 border-blue-500/25',
+  NCAAF: 'text-green-400 bg-green-500/10 border-green-500/25',
 };
 
-const LEAGUE_BG: Record<string, string> = {
-  NFL: 'bg-red-500/10 border-red-500/20',
-  NBA: 'bg-orange-500/10 border-orange-500/20',
-  MLB: 'bg-blue-500/10 border-blue-500/20',
-};
+const DEFAULT_TEAMS: FollowedTeam[] = [
+  { sport: 'baseball',    league: 'mlb',              teamId: '21'   },
+  { sport: 'basketball',  league: 'nba',               teamId: '18'   },
+  { sport: 'football',    league: 'nfl',               teamId: '19'   },
+  { sport: 'football',    league: 'college-football',  teamId: '2390' },
+];
 
-function GameCard({ game }: { game: Game }) {
-  const { homeTeam: home, awayTeam: away } = game;
-  const isLive = game.status === 'live';
-  const isFinal = game.status === 'final';
-  const homeWins = isFinal && parseInt(home.score) > parseInt(away.score);
-  const awayWins = isFinal && parseInt(away.score) > parseInt(home.score);
-  const favoriteInGame = isFavorite(home, game.league) || isFavorite(away, game.league);
-
-  return (
-    <div className={`rounded-xl border p-4 transition hover:border-zinc-600 ${
-      favoriteInGame
-        ? 'bg-amber-950/20 border-amber-500/40 shadow-lg shadow-amber-500/10'
-        : isLive ? 'bg-zinc-950 border-green-500/40'
-        : 'bg-zinc-950 border-zinc-800'
-    }`}>
-      {/* League + status */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-1.5">
-          <span className={`text-xs font-bold ${LEAGUE_COLORS[game.league]}`}>{game.league}</span>
-          {favoriteInGame && <span className="text-amber-400 text-xs">★</span>}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {isLive && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
-          <span className={`text-xs font-medium ${
-            isLive ? 'text-green-400' : isFinal ? 'text-zinc-400' : 'text-zinc-500'
-          }`}>{game.statusDetail}</span>
-        </div>
-      </div>
-
-      {/* Away team */}
-      <div className={`flex items-center justify-between py-1.5 ${awayWins ? 'opacity-100' : isFinal ? 'opacity-50' : ''}`}>
-        <div className="flex items-center gap-2.5">
-          {away.logo && (
-            <div className="w-7 h-7 relative shrink-0">
-              <Image src={away.logo} alt={away.abbr} fill className="object-contain" unoptimized />
-            </div>
-          )}
-          <span className={`text-sm ${isFavorite(away, game.league) ? 'font-bold text-amber-300' : awayWins ? 'font-bold text-white' : 'text-zinc-300'}`}>{away.abbr}</span>
-        </div>
-        <span className={`text-lg tabular-nums ${awayWins ? 'font-bold text-white' : 'font-semibold text-zinc-300'}`}>
-          {game.status !== 'scheduled' ? away.score : '–'}
-        </span>
-      </div>
-
-      {/* Divider */}
-      <div className="border-t border-zinc-800 my-1" />
-
-      {/* Home team */}
-      <div className={`flex items-center justify-between py-1.5 ${homeWins ? 'opacity-100' : isFinal ? 'opacity-50' : ''}`}>
-        <div className="flex items-center gap-2.5">
-          {home.logo && (
-            <div className="w-7 h-7 relative shrink-0">
-              <Image src={home.logo} alt={home.abbr} fill className="object-contain" unoptimized />
-            </div>
-          )}
-          <span className={`text-sm ${isFavorite(home, game.league) ? 'font-bold text-amber-300' : homeWins ? 'font-bold text-white' : 'text-zinc-300'}`}>{home.abbr}</span>
-        </div>
-        <span className={`text-lg tabular-nums ${homeWins ? 'font-bold text-white' : 'font-semibold text-zinc-300'}`}>
-          {game.status !== 'scheduled' ? home.score : '–'}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-const STANDINGS_LEAGUES = ['NFL', 'NBA', 'MLB'] as const;
-type StandingsLeague = typeof STANDINGS_LEAGUES[number];
-
-function StandingsSection() {
-  const [data, setData] = useState<StandingsData | null>(null);
-  const [league, setLeague] = useState<StandingsLeague>('NBA');
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/standings').then(r => r.json()).then(d => {
-      if (!d.error) setData(d);
-    }).catch(() => {});
-  }, []);
-
-  const rows: Standing[] = data ? data[league.toLowerCase() as keyof StandingsData] : [];
-  const conferences = [...new Set(rows.map(r => r.conference))];
-
-  return (
-    <div className="bg-zinc-950 rounded-xl border border-zinc-800 mb-6 overflow-hidden">
-      <div
-        className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-zinc-900/40 transition-colors"
-        onClick={() => setCollapsed(c => !c)}
-      >
-        <span className="text-xs font-bold text-amber-400 font-mono tracking-widest">STANDINGS</span>
-        <div className="flex items-center gap-3">
-          {!collapsed && STANDINGS_LEAGUES.map(l => (
-            <button
-              key={l}
-              onClick={e => { e.stopPropagation(); setLeague(l); }}
-              className={`text-xs font-bold px-2.5 py-1 rounded-lg transition ${
-                league === l ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-          <span className="text-zinc-600 text-xs">{collapsed ? '▸' : '▾'}</span>
-        </div>
-      </div>
-
-      {!collapsed && (
-        <div className="border-t border-zinc-800">
-          {!data ? (
-            <div className="p-4 animate-pulse">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-8 bg-zinc-900 rounded mb-1" />
-              ))}
-            </div>
-          ) : (
-            conferences.map(conf => (
-              <div key={conf}>
-                <div className="px-5 py-2 bg-zinc-900/40 border-b border-zinc-800">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest font-mono">{conf}</span>
-                </div>
-                {/* Column headers */}
-                <div className="grid px-5 py-1.5 text-xs font-bold text-zinc-600 font-mono tracking-widest border-b border-zinc-800/50"
-                  style={{ gridTemplateColumns: '2rem 1.5rem 1fr 3rem 3rem 3.5rem 3rem 4rem' }}>
-                  <span>#</span><span /><span>TEAM</span>
-                  <span className="text-right">W</span>
-                  <span className="text-right">L</span>
-                  <span className="text-right">PCT</span>
-                  <span className="text-right">GB</span>
-                  <span className="text-right">STRK</span>
-                </div>
-                <div className="divide-y divide-zinc-800/40">
-                  {rows.filter(r => r.conference === conf).map((row, i) => (
-                    <div key={row.abbr}
-                      className="grid items-center px-5 py-2 hover:bg-zinc-900/20 transition-colors"
-                      style={{ gridTemplateColumns: '2rem 1.5rem 1fr 3rem 3rem 3.5rem 3rem 4rem' }}>
-                      <span className={`text-xs font-bold font-mono ${i === 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{row.rank}</span>
-                      {row.logo ? (
-                        <div className="w-5 h-5 relative">
-                          <Image src={row.logo} alt={row.abbr} fill className="object-contain" unoptimized />
-                        </div>
-                      ) : <span />}
-                      <span className={`text-sm truncate pr-2 ${i < 3 ? 'font-semibold text-white' : 'text-zinc-400'}`}>{row.team}</span>
-                      <span className="text-sm tabular-nums text-right text-zinc-300">{row.wins}</span>
-                      <span className="text-sm tabular-nums text-right text-zinc-500">{row.losses}</span>
-                      <span className="text-sm tabular-nums text-right text-zinc-300 font-mono">{row.pct}</span>
-                      <span className="text-xs tabular-nums text-right text-zinc-500 font-mono">{row.gb === '0' ? '—' : row.gb}</span>
-                      <span className={`text-xs tabular-nums text-right font-mono ${
-                        row.streak?.startsWith('W') ? 'text-emerald-400' : row.streak?.startsWith('L') ? 'text-red-400' : 'text-zinc-500'
-                      }`}>{row.streak || '—'}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const HIGHLIGHT_LEAGUES = ['NFL', 'NBA', 'MLB'] as const;
-type HighlightLeague = typeof HIGHLIGHT_LEAGUES[number];
+const STORAGE_KEY = 'followed_teams_v1';
 
 function timeAgo(published: string) {
   const diff = Date.now() - new Date(published).getTime();
@@ -217,198 +58,329 @@ function timeAgo(published: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function HighlightsSection() {
-  const [data, setData] = useState<Record<HighlightLeague, Highlight[]> | null>(null);
-  const [league, setLeague] = useState<HighlightLeague>('NBA');
-  const [collapsed, setCollapsed] = useState(false);
+function formatGameDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatGameTime(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: () => void }) {
+  const [feed, setFeed] = useState<TeamFeed | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [newsExpanded, setNewsExpanded] = useState(false);
 
   useEffect(() => {
-    fetch('/api/highlights').then(r => r.json()).then(d => {
-      if (!d.error) setData(d);
-    }).catch(() => {});
-  }, []);
+    const { sport, league, teamId } = followed;
+    fetch(`/api/team-feed?sport=${sport}&league=${league}&teamId=${teamId}`)
+      .then(r => r.json())
+      .then(d => { if (!d.error) setFeed(d); })
+      .finally(() => setLoading(false));
+  }, [followed.teamId]);
 
-  const items: Highlight[] = data ? data[league.toLowerCase() as HighlightLeague] ?? [] : [];
+  if (loading) {
+    return <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />;
+  }
+
+  if (!feed) {
+    return (
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 text-zinc-600 text-sm">
+        Failed to load team data.
+      </div>
+    );
+  }
+
+  const { team, lastGame, nextGame, news } = feed;
+  const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
 
   return (
-    <div className="bg-zinc-950 rounded-xl border border-zinc-800 mb-6 overflow-hidden">
-      <div
-        className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-zinc-900/40 transition-colors"
-        onClick={() => setCollapsed(c => !c)}
-      >
-        <span className="text-xs font-bold text-amber-400 font-mono tracking-widest">HIGHLIGHTS & NEWS</span>
+    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+      {/* Team header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          {!collapsed && HIGHLIGHT_LEAGUES.map(l => (
-            <button
-              key={l}
-              onClick={e => { e.stopPropagation(); setLeague(l); }}
-              className={`text-xs font-bold px-2.5 py-1 rounded-lg transition ${
-                league === l ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-          <span className="text-zinc-600 text-xs">{collapsed ? '▸' : '▾'}</span>
+          {team.logo && (
+            <div className="w-9 h-9 relative shrink-0">
+              <Image src={team.logo} alt={team.abbr} fill className="object-contain" unoptimized />
+            </div>
+          )}
+          <div>
+            <p className="text-sm font-bold text-white">{team.name}</p>
+            <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
+              {team.league}
+            </span>
+          </div>
         </div>
+        <button onClick={onRemove} className="text-zinc-700 hover:text-red-400 text-xs transition">✕</button>
       </div>
 
-      {!collapsed && (
-        <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
-          {!data ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex gap-4 p-4 animate-pulse">
-                <div className="w-24 h-16 bg-zinc-900 rounded-lg shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-zinc-900 rounded w-3/4" />
-                  <div className="h-3 bg-zinc-900 rounded w-1/2" />
-                </div>
-              </div>
-            ))
-          ) : items.length === 0 ? (
-            <p className="text-zinc-600 text-sm p-5">No highlights available.</p>
-          ) : (
-            items.map(item => (
-              <a
-                key={item.id}
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex gap-4 p-4 hover:bg-zinc-900/40 transition-colors group"
-              >
-                {item.image && (
-                  <div className="w-24 h-16 relative rounded-lg overflow-hidden shrink-0 bg-zinc-900">
-                    <Image src={item.image} alt="" fill className="object-cover" unoptimized />
-                    {item.type === 'Media' && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <span className="text-white text-lg">▶</span>
-                      </div>
-                    )}
+      <div className="divide-y divide-zinc-800/60">
+        {/* Last game */}
+        {lastGame && (
+          <div className="px-5 py-3">
+            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Last Game</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {lastGame.opponentLogo && (
+                  <div className="w-6 h-6 relative shrink-0">
+                    <Image src={lastGame.opponentLogo} alt={lastGame.opponentAbbr} fill className="object-contain" unoptimized />
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-200 group-hover:text-amber-400 transition-colors leading-snug line-clamp-2">
-                    {item.headline}
+                <div>
+                  <p className="text-sm text-zinc-300">
+                    {lastGame.homeAway === 'home' ? 'vs' : '@'} {lastGame.opponentAbbr}
                   </p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded font-mono ${
-                      item.type === 'Media' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      item.type === 'Recap' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                      'bg-zinc-800 text-zinc-500 border border-zinc-700'
-                    }`}>
-                      {item.type === 'Media' ? '▶ VIDEO' : item.type === 'Recap' ? 'RECAP' : 'NEWS'}
-                    </span>
-                    <span className="text-xs text-zinc-600">{timeAgo(item.published)}</span>
-                  </div>
+                  <p className="text-xs text-zinc-600">{formatGameDate(lastGame.date)} · {lastGame.statusDetail}</p>
                 </div>
-              </a>
-            ))
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold tabular-nums text-white">
+                  {lastGame.teamScore}–{lastGame.opponentScore}
+                </p>
+                {lastGame.result && (
+                  <span className={`text-xs font-bold ${lastGame.result === 'W' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {lastGame.result}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Next game */}
+        {nextGame && (
+          <div className="px-5 py-3">
+            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Next Game</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {nextGame.opponentLogo && (
+                  <div className="w-6 h-6 relative shrink-0">
+                    <Image src={nextGame.opponentLogo} alt={nextGame.opponentAbbr} fill className="object-contain" unoptimized />
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-zinc-300">
+                    {nextGame.homeAway === 'home' ? 'vs' : '@'} {nextGame.opponentAbbr}
+                  </p>
+                  <p className="text-xs text-zinc-600">
+                    {formatGameDate(nextGame.date)} · {formatGameTime(nextGame.date)}
+                    {nextGame.venue ? ` · ${nextGame.venue}` : ''}
+                  </p>
+                  {nextGame.probablePitchers && (nextGame.probablePitchers.ours || nextGame.probablePitchers.theirs) && (
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {nextGame.probablePitchers.ours && `⚾ ${nextGame.probablePitchers.ours}`}
+                      {nextGame.probablePitchers.ours && nextGame.probablePitchers.theirs && ' vs '}
+                      {nextGame.probablePitchers.theirs && nextGame.probablePitchers.theirs}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* News */}
+        {news.length > 0 && (
+          <div className="px-5 py-3">
+            <button
+              onClick={() => setNewsExpanded(e => !e)}
+              className="flex items-center justify-between w-full mb-2"
+            >
+              <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono">News & Highlights</p>
+              <span className="text-zinc-600 text-xs">{newsExpanded ? '▴' : '▾'}</span>
+            </button>
+            {newsExpanded ? (
+              <div className="space-y-2">
+                {news.map(item => (
+                  <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer"
+                    className="flex gap-3 group hover:bg-zinc-900/40 rounded-lg p-1.5 transition -mx-1.5">
+                    {item.image && (
+                      <div className="w-16 h-10 relative rounded overflow-hidden shrink-0 bg-zinc-900">
+                        <Image src={item.image} alt="" fill className="object-cover" unoptimized />
+                        {item.type === 'Media' && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <span className="text-white text-xs">▶</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-zinc-300 group-hover:text-white line-clamp-2 leading-snug transition">{item.headline}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5">{timeAgo(item.published)}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 line-clamp-1">{news[0]?.headline}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddTeamPanel({ followed, onAdd, onClose }: {
+  followed: FollowedTeam[];
+  onAdd: (team: FollowedTeam) => void;
+  onClose: () => void;
+}) {
+  const [selectedLeague, setSelectedLeague] = useState(LEAGUE_OPTIONS[0]);
+  const [teams, setTeams] = useState<{ id: string; name: string; abbr: string; logo: string }[]>([]);
+  const [search, setSearch] = useState('');
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  useEffect(() => {
+    setLoadingTeams(true);
+    setTeams([]);
+    fetch(`/api/teams-list?sport=${selectedLeague.sport}&league=${selectedLeague.league}`)
+      .then(r => r.json())
+      .then(d => setTeams(d.teams ?? []))
+      .finally(() => setLoadingTeams(false));
+  }, [selectedLeague]);
+
+  const isFollowed = (teamId: string) =>
+    followed.some(f => f.teamId === teamId && f.league === selectedLeague.league);
+
+  const filtered = teams.filter(t =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.abbr.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <p className="text-sm font-bold text-white">Follow a Team</p>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white transition">✕</button>
+        </div>
+
+        {/* League selector */}
+        <div className="flex gap-1.5 p-4 border-b border-zinc-800">
+          {LEAGUE_OPTIONS.map(l => (
+            <button key={l.league} onClick={() => { setSelectedLeague(l); setSearch(''); }}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold font-mono border transition ${
+                selectedLeague.league === l.league
+                  ? 'bg-amber-500 text-black border-amber-500'
+                  : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'
+              }`}>{l.label}</button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-3 border-b border-zinc-800">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search teams…"
+            className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none transition"
+          />
+        </div>
+
+        {/* Team list */}
+        <div className="overflow-y-auto flex-1">
+          {loadingTeams ? (
+            <div className="p-6 text-center text-zinc-600 text-sm">Loading teams…</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-6 text-center text-zinc-600 text-sm">No teams found.</div>
+          ) : (
+            <div className="divide-y divide-zinc-800/40">
+              {filtered.map(team => {
+                const already = isFollowed(team.id);
+                return (
+                  <button
+                    key={team.id}
+                    disabled={already}
+                    onClick={() => {
+                      onAdd({ sport: selectedLeague.sport, league: selectedLeague.league, teamId: team.id });
+                      onClose();
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${
+                      already ? 'opacity-40 cursor-default' : 'hover:bg-zinc-900/50'
+                    }`}
+                  >
+                    {team.logo && (
+                      <div className="w-7 h-7 relative shrink-0">
+                        <Image src={team.logo} alt={team.abbr} fill className="object-contain" unoptimized />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium">{team.name}</p>
+                      <p className="text-xs text-zinc-600 font-mono">{team.abbr}</p>
+                    </div>
+                    {already && <span className="text-xs text-zinc-600 font-mono">Following</span>}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 export default function SportsTab() {
-  const [scores, setScores] = useState<Scores | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<LeagueFilter>('All');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const load = async () => {
-    const res = await fetch('/api/sports');
-    const data = await res.json();
-    setScores(data);
-    setLastUpdated(new Date());
-    setLoading(false);
-  };
+  const [followed, setFollowed] = useState<FollowedTeam[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    const stored = localStorage.getItem(STORAGE_KEY);
+    setFollowed(stored ? JSON.parse(stored) : DEFAULT_TEAMS);
   }, []);
 
-  const allGames: Game[] = scores ? [...scores.nfl, ...scores.nba, ...scores.mlb] : [];
-  const filtered = filter === 'All' ? allGames : allGames.filter(g => g.league === filter);
+  function save(teams: FollowedTeam[]) {
+    setFollowed(teams);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(teams));
+  }
 
-  const sorted = [...filtered].sort((a, b) => {
-    const favA = isFavorite(a.homeTeam, a.league) || isFavorite(a.awayTeam, a.league) ? 0 : 1;
-    const favB = isFavorite(b.homeTeam, b.league) || isFavorite(b.awayTeam, b.league) ? 0 : 1;
-    if (favA !== favB) return favA - favB;
-    const order = { live: 0, scheduled: 1, final: 2 };
-    return order[a.status] - order[b.status];
-  });
+  function addTeam(team: FollowedTeam) {
+    if (followed.some(f => f.teamId === team.teamId && f.league === team.league)) return;
+    save([...followed, team]);
+  }
 
-  const liveCount = allGames.filter(g => g.status === 'live').length;
+  function removeTeam(teamId: string, league: string) {
+    save(followed.filter(f => !(f.teamId === teamId && f.league === league)));
+  }
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">Scores</h2>
-          {liveCount > 0 && (
-            <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2.5 py-1 rounded-lg">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-green-400 font-medium">{liveCount} live</span>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {lastUpdated && (
-            <span className="text-xs text-zinc-600">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-          <button onClick={load} className="text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 rounded-lg transition">
-            Refresh
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold text-white">My Teams</h2>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs px-4 py-2 rounded-lg transition"
+        >
+          + Follow Team
+        </button>
       </div>
 
-      {/* Standings */}
-      <StandingsSection />
-
-      {/* Highlights & News */}
-      <HighlightsSection />
-
-      {/* League filter */}
-      <div className="flex gap-2 mb-6">
-        {LEAGUES.map(l => (
-          <button key={l} onClick={() => setFilter(l)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              filter === l
-                ? l === 'All' ? 'bg-zinc-700 text-white border border-zinc-600'
-                  : `${LEAGUE_BG[l]} border ${LEAGUE_COLORS[l]}`
-                : 'bg-zinc-950 text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-600'
-            }`}>
-            {l}
-            {l !== 'All' && scores && (
-              <span className="ml-1.5 text-xs opacity-60">
-                {scores[l.toLowerCase() as keyof Scores]?.length ?? 0}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Games grid */}
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-zinc-950 rounded-xl border border-zinc-800 p-4 animate-pulse h-36" />
-          ))}
-        </div>
-      ) : sorted.length === 0 ? (
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-12 text-center text-zinc-500">
-          No games found for {filter === 'All' ? 'any league' : filter} right now.
+      {followed.length === 0 ? (
+        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
+          No teams followed yet. Hit "+ Follow Team" to get started.
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {sorted.map(game => <GameCard key={game.id} game={game} />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {followed.map(f => (
+            <TeamCard
+              key={`${f.league}-${f.teamId}`}
+              followed={f}
+              onRemove={() => removeTeam(f.teamId, f.league)}
+            />
+          ))}
         </div>
+      )}
+
+      {showAdd && (
+        <AddTeamPanel
+          followed={followed}
+          onAdd={addTeam}
+          onClose={() => setShowAdd(false)}
+        />
       )}
     </div>
   );
