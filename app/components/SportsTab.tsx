@@ -327,10 +327,12 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
 export default function SportsTab() {
   const [followed, setFollowed] = useState<FollowedTeam[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     setFollowed(stored ? JSON.parse(stored) : DEFAULT_TEAMS);
+    setMounted(true);
   }, []);
 
   function save(teams: FollowedTeam[]) {
@@ -346,6 +348,14 @@ export default function SportsTab() {
   function removeTeam(teamId: string, league: string) {
     save(followed.filter(f => !(f.teamId === teamId && f.league === league)));
   }
+
+  if (!mounted) return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />
+      ))}
+    </div>
+  );
 
   return (
     <div>
