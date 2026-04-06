@@ -168,7 +168,120 @@ function TaskCard({ task, onUpdate, onDelete }: {
   onDelete: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editNotes, setEditNotes] = useState(task.notes);
+  const [editPriority, setEditPriority] = useState<Priority>(task.priority);
+  const [editCategory, setEditCategory] = useState<Category>(task.category);
+  const [editDueDate, setEditDueDate] = useState(task.due_date ?? '');
+  const [editRecurrence, setEditRecurrence] = useState<string | null>(task.recurrence);
+  const [saving, setSaving] = useState(false);
   const due = dueDateLabel(task.due_date);
+
+  function startEdit() {
+    setEditTitle(task.title);
+    setEditNotes(task.notes);
+    setEditPriority(task.priority);
+    setEditCategory(task.category);
+    setEditDueDate(task.due_date ?? '');
+    setEditRecurrence(task.recurrence);
+    setEditing(true);
+    setExpanded(false);
+  }
+
+  async function saveEdit() {
+    if (!editTitle.trim()) return;
+    setSaving(true);
+    const patch = {
+      title: editTitle.trim(),
+      notes: editNotes,
+      priority: editPriority,
+      category: editCategory,
+      due_date: editDueDate || null,
+      recurrence: editRecurrence,
+    };
+    await onUpdate(task.id, patch);
+    setEditing(false);
+    setSaving(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-zinc-950 border border-amber-500/30 rounded-xl p-5 space-y-3">
+        <input
+          autoFocus
+          type="text"
+          value={editTitle}
+          onChange={e => setEditTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false); }}
+          className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none transition"
+        />
+        <textarea
+          value={editNotes}
+          onChange={e => setEditNotes(e.target.value)}
+          placeholder="Notes (optional)…"
+          rows={2}
+          className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700 resize-none focus:outline-none transition"
+        />
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Priority</label>
+            <div className="flex gap-1.5">
+              {(['High', 'Medium', 'Low'] as Priority[]).map(p => (
+                <button key={p} type="button" onClick={() => setEditPriority(p)}
+                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${editPriority === p ? PRIORITY_STYLES[p] : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Category</label>
+            <div className="flex gap-1.5">
+              {(['Business', 'Personal'] as Category[]).map(c => (
+                <button key={c} type="button" onClick={() => setEditCategory(c)}
+                  className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${editCategory === c ? CATEGORY_STYLES[c] : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Due Date</label>
+            <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-1 text-xs text-zinc-300 focus:outline-none transition" />
+          </div>
+          <div className="flex flex-col gap-1 justify-end">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Repeat</label>
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => setEditRecurrence(r => r === 'daily' ? null : 'daily')}
+                className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${editRecurrence === 'daily' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}>
+                ↻ Daily
+              </button>
+              <button type="button" onClick={() => setEditRecurrence(r => r === 'monthly' ? null : 'monthly')}
+                className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${editRecurrence === 'monthly' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}>
+                ↻ Monthly
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={saveEdit} disabled={saving || !editTitle.trim()}
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs px-4 py-2 rounded-lg transition">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={() => setEditing(false)}
+            className="text-zinc-500 hover:text-white text-xs px-4 py-2 rounded-lg border border-zinc-800 hover:border-zinc-600 transition">
+            Cancel
+          </button>
+          <button onClick={() => { setEditing(false); onDelete(task.id); }}
+            className="ml-auto text-xs text-red-400 hover:text-red-300 border border-red-400/20 hover:border-red-400/40 px-3 py-2 rounded-lg transition">
+            Delete
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-zinc-950 rounded-xl border transition-colors ${
@@ -204,38 +317,16 @@ function TaskCard({ task, onUpdate, onDelete }: {
             {task.recurrence === 'daily' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ daily</span>}
             {task.recurrence === 'monthly' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ monthly</span>}
           </div>
-          {task.notes && !expanded && (
+          {task.notes && (
             <p className="text-xs text-zinc-600 mt-1.5 truncate">{task.notes}</p>
-          )}
-          {expanded && (
-            <div className="mt-3 space-y-2">
-              {task.notes && <p className="text-xs text-zinc-400">{task.notes}</p>}
-              <div className="flex gap-2 flex-wrap">
-                {(['High', 'Medium', 'Low'] as Priority[]).map(p => (
-                  <button key={p} onClick={() => onUpdate(task.id, { priority: p })}
-                    className={`text-xs font-bold px-2 py-0.5 rounded-md border transition ${task.priority === p ? PRIORITY_STYLES[p] : 'bg-zinc-900 text-zinc-600 border-zinc-800 hover:text-white'}`}>
-                    {p}
-                  </button>
-                ))}
-                {(['Business', 'Personal'] as Category[]).map(c => (
-                  <button key={c} onClick={() => onUpdate(task.id, { category: c })}
-                    className={`text-xs font-bold px-2 py-0.5 rounded-md border transition ${task.category === c ? CATEGORY_STYLES[c] : 'bg-zinc-900 text-zinc-600 border-zinc-800 hover:text-white'}`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => onDelete(task.id)}
-                className="text-xs text-red-400 hover:text-red-300 border border-red-400/20 hover:border-red-400/40 px-3 py-1 rounded-lg transition">
-                Delete
-              </button>
-            </div>
           )}
         </div>
 
-        {/* Expand toggle */}
-        <button onClick={() => setExpanded(e => !e)} className="text-zinc-600 hover:text-zinc-400 text-xs shrink-0 transition">
-          {expanded ? '▴' : '▾'}
-        </button>
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button onClick={startEdit} className="text-zinc-600 hover:text-amber-400 text-xs transition px-1" title="Edit">✎</button>
+          <button onClick={() => onDelete(task.id)} className="text-zinc-600 hover:text-red-400 text-xs transition px-1" title="Delete">✕</button>
+        </div>
       </div>
     </div>
   );
