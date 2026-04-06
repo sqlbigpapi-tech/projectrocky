@@ -12,6 +12,7 @@ type Task = {
   due_date: string | null;
   category: Category;
   completed: boolean;
+  recurrence: string | null;
   created_at: string;
 };
 
@@ -46,6 +47,7 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
   const [priority, setPriority] = useState<Priority>('Medium');
   const [category, setCategory] = useState<Category>('Personal');
   const [dueDate, setDueDate] = useState('');
+  const [recurrence, setRecurrence] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -55,11 +57,11 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), notes, priority, category, due_date: dueDate || null }),
+      body: JSON.stringify({ title: title.trim(), notes, priority, category, due_date: dueDate || null, recurrence }),
     });
     const { task } = await res.json();
     onAdd(task);
-    setTitle(''); setNotes(''); setPriority('Medium'); setCategory('Personal'); setDueDate('');
+    setTitle(''); setNotes(''); setPriority('Medium'); setCategory('Personal'); setDueDate(''); setRecurrence(null);
     setOpen(false);
     setSaving(false);
   }
@@ -129,6 +131,15 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
             className="bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-1 text-xs text-zinc-300 focus:outline-none transition"
           />
         </div>
+        {/* Recurrence */}
+        <div className="flex flex-col gap-1 justify-end">
+          <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Repeat</label>
+          <button
+            type="button"
+            onClick={() => setRecurrence(r => r === 'daily' ? null : 'daily')}
+            className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${recurrence === 'daily' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
+          >↻ Daily</button>
+        </div>
       </div>
       <div className="flex gap-2 pt-1">
         <button
@@ -183,6 +194,7 @@ function TaskCard({ task, onUpdate, onDelete }: {
               {task.category}
             </span>
             {due && <span className={`text-xs font-mono ${due.color}`}>{due.text}</span>}
+            {task.recurrence === 'daily' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ daily</span>}
           </div>
           {task.notes && !expanded && (
             <p className="text-xs text-zinc-600 mt-1.5 truncate">{task.notes}</p>
@@ -236,6 +248,20 @@ export default function TasksTab() {
   }, []);
 
   async function handleUpdate(id: string, patch: Partial<Task>) {
+    const task = tasks.find(t => t.id === id);
+    if (patch.completed === true && task?.recurrence === 'daily') {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const due_date = tomorrow.toISOString().split('T')[0];
+      const recurPatch = { completed: false, due_date };
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, ...recurPatch } : t));
+      await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...recurPatch }),
+      });
+      return;
+    }
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
     await fetch('/api/tasks', {
       method: 'PATCH',

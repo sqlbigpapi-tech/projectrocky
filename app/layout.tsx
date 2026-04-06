@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ortiz OS",
-  description: "Ortiz OS — sports, news, tasks, and more",
+  title: "Project Rocky",
+  description: "Project Rocky — sports, news, tasks, and more",
 };
 
 export default function RootLayout({

@@ -28,13 +28,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [scheduleRes, newsRes] = await Promise.all([
+    const [scheduleRes, newsRes, scoreboardRes] = await Promise.all([
       fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${teamId}/schedule`, { next: { revalidate: 300 } }),
       fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news?team=${teamId}&limit=6`, { next: { revalidate: 300 } }),
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`, { cache: 'no-store' }),
     ]);
 
     const scheduleData = await scheduleRes.json();
     const newsData = await newsRes.json();
+    const scoreboardData = await scoreboardRes.json().catch(() => ({}));
 
     const team = scheduleData.team;
     const events: any[] = scheduleData.events ?? [];
@@ -56,18 +58,25 @@ export async function GET(request: Request) {
       ?? null;
     const record = espnRecord ?? (pastGames.length > 0 ? `${wins}-${losses}` : null);
 
+    // Check scoreboard (no-cache) first for live games — schedule endpoint may be stale
+    const scoreboardEvents: any[] = scoreboardData.events ?? [];
+    const liveScoreboardEvent = scoreboardEvents.find(e =>
+      e.competitions?.[0]?.status?.type?.state === 'in' &&
+      e.competitions?.[0]?.competitors?.some((c: any) => c.team.id === teamId)
+    ) ?? null;
+
     const liveGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'in');
-    const liveEvent = liveGames[0] ?? null;
+    const liveEvent = liveScoreboardEvent ?? liveGames[0] ?? null;
 
     const futureGames = events.filter(e => e.competitions?.[0]?.status?.type?.state === 'pre');
     const nextEvent = futureGames[0] ?? null;
 
     function str(val: any): string {
-      if (!val) return '';
+      if (val === null || val === undefined) return '';
       if (typeof val === 'string') return val;
       if (typeof val === 'number') return String(val);
-      if (val.displayValue) return val.displayValue;
-      if (val.value) return String(val.value);
+      if (val.displayValue !== undefined) return String(val.displayValue);
+      if (val.value !== undefined) return String(val.value);
       return '';
     }
 
@@ -81,6 +90,7 @@ export async function GET(request: Request) {
       const oppProbable = probables.find((p: any) => p.homeAway !== ourComp?.homeAway);
 
       return {
+        id: str(event.id),
         date: str(event.date),
         opponent: str(oppComp?.team?.displayName),
         opponentAbbr: str(oppComp?.team?.abbreviation),
