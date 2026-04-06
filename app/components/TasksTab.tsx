@@ -134,11 +134,18 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
         {/* Recurrence */}
         <div className="flex flex-col gap-1 justify-end">
           <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Repeat</label>
-          <button
-            type="button"
-            onClick={() => setRecurrence(r => r === 'daily' ? null : 'daily')}
-            className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${recurrence === 'daily' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
-          >↻ Daily</button>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setRecurrence(r => r === 'daily' ? null : 'daily')}
+              className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${recurrence === 'daily' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
+            >↻ Daily</button>
+            <button
+              type="button"
+              onClick={() => setRecurrence(r => r === 'monthly' ? null : 'monthly')}
+              className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${recurrence === 'monthly' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
+            >↻ Monthly</button>
+          </div>
         </div>
       </div>
       <div className="flex gap-2 pt-1">
@@ -195,6 +202,7 @@ function TaskCard({ task, onUpdate, onDelete }: {
             </span>
             {due && <span className={`text-xs font-mono ${due.color}`}>{due.text}</span>}
             {task.recurrence === 'daily' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ daily</span>}
+            {task.recurrence === 'monthly' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ monthly</span>}
           </div>
           {task.notes && !expanded && (
             <p className="text-xs text-zinc-600 mt-1.5 truncate">{task.notes}</p>
@@ -253,6 +261,19 @@ export default function TasksTab() {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const due_date = tomorrow.toISOString().split('T')[0];
+      const recurPatch = { completed: false, due_date };
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, ...recurPatch } : t));
+      await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...recurPatch }),
+      });
+      return;
+    }
+    if (patch.completed === true && task?.recurrence === 'monthly') {
+      const base = task.due_date ? new Date(task.due_date + 'T00:00:00') : new Date();
+      base.setMonth(base.getMonth() + 1);
+      const due_date = base.toISOString().split('T')[0];
       const recurPatch = { completed: false, due_date };
       setTasks(prev => prev.map(t => t.id === id ? { ...t, ...recurPatch } : t));
       await fetch('/api/tasks', {
