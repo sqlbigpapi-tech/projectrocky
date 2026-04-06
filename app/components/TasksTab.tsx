@@ -241,9 +241,104 @@ function TaskCard({ task, onUpdate, onDelete }: {
   );
 }
 
+const PRIORITY_DOT: Record<Priority, string> = {
+  High:   'bg-red-400',
+  Medium: 'bg-amber-400',
+  Low:    'bg-zinc-500',
+};
+
+function CalendarView({ tasks, onUpdate }: { tasks: Task[]; onUpdate: (id: string, patch: Partial<Task>) => void }) {
+  const today = new Date();
+  const [calDate, setCalDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const tasksByDate: Record<string, Task[]> = {};
+  for (const t of tasks) {
+    if (t.due_date) {
+      if (!tasksByDate[t.due_date]) tasksByDate[t.due_date] = [];
+      tasksByDate[t.due_date].push(t);
+    }
+  }
+
+  const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const todayISO = today.toISOString().split('T')[0];
+
+  return (
+    <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+      {/* Month nav */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
+        <button onClick={() => setCalDate(new Date(year, month - 1, 1))} className="text-zinc-500 hover:text-white transition px-2 py-1 text-sm">‹</button>
+        <p className="text-sm font-semibold text-white font-mono">
+          {calDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </p>
+        <button onClick={() => setCalDate(new Date(year, month + 1, 1))} className="text-zinc-500 hover:text-white transition px-2 py-1 text-sm">›</button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 border-b border-zinc-800">
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+          <div key={d} className="py-2 text-center text-xs text-zinc-600 font-mono uppercase tracking-widest">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          const iso = day ? `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}` : null;
+          const dayTasks = iso ? (tasksByDate[iso] ?? []) : [];
+          const isToday = iso === todayISO;
+          return (
+            <div key={i} className={`min-h-[72px] border-b border-r border-zinc-800/60 p-1.5 ${!day ? 'bg-zinc-900/20' : ''}`}>
+              {day && (
+                <>
+                  <p className={`text-xs font-mono mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-amber-500 text-black font-bold' : 'text-zinc-500'}`}>
+                    {day}
+                  </p>
+                  <div className="space-y-0.5">
+                    {dayTasks.slice(0, 3).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => onUpdate(t.id, { completed: !t.completed })}
+                        className={`w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-xs leading-tight transition hover:opacity-70 ${t.completed ? 'opacity-40' : ''}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_DOT[t.priority]}`} />
+                        <span className={`truncate ${t.completed ? 'line-through text-zinc-600' : 'text-zinc-300'}`}>{t.title}</span>
+                      </button>
+                    ))}
+                    {dayTasks.length > 3 && (
+                      <p className="text-xs text-zinc-600 font-mono px-1">+{dayTasks.length - 3} more</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-4 px-5 py-3 border-t border-zinc-800">
+        {(['High','Medium','Low'] as Priority[]).map(p => (
+          <span key={p} className="flex items-center gap-1.5 text-xs text-zinc-600 font-mono">
+            <span className={`w-2 h-2 rounded-full ${PRIORITY_DOT[p]}`} />
+            {p}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TasksTab() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [showCompleted, setShowCompleted] = useState(false);
@@ -324,7 +419,23 @@ export default function TasksTab() {
             {open.length} open{overdue.length > 0 ? ` · ${overdue.length} overdue` : ''}
           </p>
         </div>
+        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+          <button
+            onClick={() => setView('list')}
+            className={`text-xs font-mono px-3 py-1 rounded-md transition ${view === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}
+          >List</button>
+          <button
+            onClick={() => setView('calendar')}
+            className={`text-xs font-mono px-3 py-1 rounded-md transition ${view === 'calendar' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}
+          >Calendar</button>
+        </div>
       </div>
+
+      {view === 'calendar' && (
+        <CalendarView tasks={tasks} onUpdate={handleUpdate} />
+      )}
+
+      {view === 'list' && <>
 
       {/* Summary pills */}
       <div className="grid grid-cols-3 gap-3 mb-6">
@@ -382,6 +493,8 @@ export default function TasksTab() {
           ))}
         </div>
       )}
+
+      </>}
     </div>
   );
 }
