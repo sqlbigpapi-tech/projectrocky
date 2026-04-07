@@ -62,17 +62,92 @@ function KpiCard({ label, value, unit, sub, color = 'text-white', icon }: { labe
   );
 }
 
+type OuraReadiness = { day: string; score: number; temperature_deviation: number | null };
+type OuraSleep = {
+  day: string; score: number;
+  total_sleep_duration: number; deep_sleep_duration: number;
+  rem_sleep_duration: number; light_sleep_duration: number;
+  average_hrv: number | null; lowest_heart_rate: number | null;
+  efficiency: number | null;
+};
+type OuraActivity = { day: string; score: number; active_calories: number; steps: number };
+
+function secToHM(s: number) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function scoreColor(score: number) {
+  if (score >= 85) return 'text-emerald-400';
+  if (score >= 70) return 'text-amber-400';
+  return 'text-red-400';
+}
+
+function ScoreRing({ score, color }: { score: number; color: string }) {
+  const r = 28; const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  return (
+    <svg width="72" height="72" className="-rotate-90">
+      <circle cx="36" cy="36" r={r} fill="none" stroke="#27272a" strokeWidth="6" />
+      <circle cx="36" cy="36" r={r} fill="none" stroke="currentColor" strokeWidth="6"
+        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+        className={`transition-all duration-700 ${color}`} />
+      <text x="36" y="36" textAnchor="middle" dominantBaseline="middle"
+        className="rotate-90 fill-current font-bold" style={{ fontSize: 16, fontFamily: 'monospace' }}
+        transform="rotate(90 36 36)">{score}</text>
+    </svg>
+  );
+}
+
 export default function HealthTab() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<7 | 14 | 30>(14);
+  const [ouraReadiness, setOuraReadiness] = useState<OuraReadiness[]>([]);
+  const [ouraSleep, setOuraSleep] = useState<OuraSleep[]>([]);
+  const [ouraActivity, setOuraActivity] = useState<OuraActivity[]>([]);
+  const [ouraError, setOuraError] = useState('');
+  const [ouraNoToken, setOuraNoToken] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
       .then(r => r.json())
       .then(d => setRows(d.metrics ?? []))
       .finally(() => setLoading(false));
+    fetch('/api/oura')
+      .then(r => r.json())
+      .then(d => {
+        if (d.error === 'no_token') { setOuraNoToken(true); return; }
+        if (d.error) { setOuraError(d.error); return; }
+        setOuraReadiness(d.readiness ?? []);
+        setOuraSleep(d.sleep ?? []);
+        setOuraActivity(d.activity ?? []);
+      })
+      .catch(() => setOuraError('Failed to load Oura data'));
   }, []);
+
+  async function saveOuraToken() {
+    if (!tokenInput.trim()) return;
+    setSavingToken(true);
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'oura_token', value: tokenInput.trim() }),
+    });
+    setSavingToken(false);
+    setOuraNoToken(false);
+    setTokenInput('');
+    // Reload Oura data
+    fetch('/api/oura').then(r => r.json()).then(d => {
+      if (d.error) { setOuraError(d.error); return; }
+      setOuraReadiness(d.readiness ?? []);
+      setOuraSleep(d.sleep ?? []);
+      setOuraActivity(d.activity ?? []);
+    });
+  }
 
   if (loading) return (
     <div className="space-y-4">
@@ -306,6 +381,167 @@ export default function HealthTab() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* ── Oura Ring Section ── */}
+      <div className="rounded-2xl border border-indigo-600/20 bg-gradient-to-br from-indigo-950/20 via-zinc-950 to-zinc-950 p-5">
+        <p className="text-xs text-indigo-400/70 uppercase tracking-[0.3em] font-mono mb-4">Oura Ring</p>
+
+        {/* Token setup */}
+        {ouraNoToken && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">Connect your Oura Ring to see readiness, sleep, and recovery data.</p>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-400 font-mono space-y-2">
+              <p className="text-white font-bold mb-2">Setup:</p>
+              <p>1. Go to <span className="text-indigo-400">cloud.ouraring.com</span></p>
+              <p>2. Account → Personal Access Tokens</p>
+              <p>3. Create a new token and paste it below</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={tokenInput}
+                onChange={e => setTokenInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveOuraToken()}
+                placeholder="Paste personal access token…"
+                className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500/50 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none transition font-mono"
+              />
+              <button onClick={saveOuraToken} disabled={savingToken || !tokenInput.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-lg transition">
+                {savingToken ? 'Saving…' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {ouraError && !ouraNoToken && (
+          <p className="text-xs text-red-400 font-mono">{ouraError}</p>
+        )}
+
+        {ouraSleep.length > 0 && (() => {
+          const todaySleep = ouraSleep[ouraSleep.length - 1];
+          const todayReadiness = ouraReadiness[ouraReadiness.length - 1];
+          const todayActivity = ouraActivity[ouraActivity.length - 1];
+
+          const avgHRV7 = ouraSleep.slice(-7).reduce((s, d) => s + (d.average_hrv ?? 0), 0) / Math.min(7, ouraSleep.length);
+
+          return (
+            <div className="space-y-5">
+              {/* Score rings row */}
+              <div className="grid grid-cols-3 gap-4">
+                {todayReadiness && (
+                  <div className="flex flex-col items-center gap-2">
+                    <ScoreRing score={todayReadiness.score} color={scoreColor(todayReadiness.score)} />
+                    <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Readiness</p>
+                    {todayReadiness.temperature_deviation != null && (
+                      <p className="text-xs text-zinc-600 font-mono">{todayReadiness.temperature_deviation > 0 ? '+' : ''}{todayReadiness.temperature_deviation.toFixed(2)}°C</p>
+                    )}
+                  </div>
+                )}
+                {todaySleep && (
+                  <div className="flex flex-col items-center gap-2">
+                    <ScoreRing score={todaySleep.score} color={scoreColor(todaySleep.score)} />
+                    <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Sleep</p>
+                    <p className="text-xs text-zinc-600 font-mono">{secToHM(todaySleep.total_sleep_duration)}</p>
+                  </div>
+                )}
+                {todayActivity && (
+                  <div className="flex flex-col items-center gap-2">
+                    <ScoreRing score={todayActivity.score} color={scoreColor(todayActivity.score)} />
+                    <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Activity</p>
+                    <p className="text-xs text-zinc-600 font-mono">{todayActivity.steps.toLocaleString()} steps</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Last night's sleep breakdown */}
+              {todaySleep && (
+                <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-4">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-3">Last Night's Sleep</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Total', value: secToHM(todaySleep.total_sleep_duration), color: 'text-indigo-300' },
+                      { label: 'Deep', value: secToHM(todaySleep.deep_sleep_duration), color: 'text-indigo-400' },
+                      { label: 'REM', value: secToHM(todaySleep.rem_sleep_duration), color: 'text-violet-400' },
+                      { label: 'Light', value: secToHM(todaySleep.light_sleep_duration), color: 'text-blue-400' },
+                    ].map(s => (
+                      <div key={s.label}>
+                        <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-1">{s.label}</p>
+                        <p className={`text-lg font-bold tabular-nums font-mono ${s.color}`}>{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Sleep stage bar */}
+                  <div className="mt-3">
+                    <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+                      {(() => {
+                        const total = todaySleep.total_sleep_duration;
+                        const deepPct  = (todaySleep.deep_sleep_duration / total) * 100;
+                        const remPct   = (todaySleep.rem_sleep_duration / total) * 100;
+                        const lightPct = (todaySleep.light_sleep_duration / total) * 100;
+                        return (
+                          <>
+                            <div className="bg-indigo-500 rounded-l-full" style={{ width: `${deepPct}%` }} />
+                            <div className="bg-violet-500" style={{ width: `${remPct}%` }} />
+                            <div className="bg-blue-500/60 rounded-r-full" style={{ width: `${lightPct}%` }} />
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="flex gap-4 mt-2">
+                      {[['Deep','bg-indigo-500'],['REM','bg-violet-500'],['Light','bg-blue-500/60']].map(([l,c]) => (
+                        <span key={l} className="flex items-center gap-1.5 text-xs text-zinc-600 font-mono">
+                          <span className={`w-2 h-2 rounded-full ${c}`} />
+                          {l}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {(todaySleep.average_hrv || todaySleep.lowest_heart_rate || todaySleep.efficiency) && (
+                    <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-zinc-800">
+                      {todaySleep.average_hrv && <div>
+                        <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-0.5">Avg HRV</p>
+                        <p className="text-base font-bold text-violet-400 font-mono">{Math.round(todaySleep.average_hrv)}ms <span className="text-xs text-zinc-600 font-normal">(7d avg {Math.round(avgHRV7)}ms)</span></p>
+                      </div>}
+                      {todaySleep.lowest_heart_rate && <div>
+                        <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-0.5">Low HR</p>
+                        <p className="text-base font-bold text-rose-400 font-mono">{todaySleep.lowest_heart_rate} bpm</p>
+                      </div>}
+                      {todaySleep.efficiency && <div>
+                        <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-0.5">Efficiency</p>
+                        <p className="text-base font-bold text-emerald-400 font-mono">{todaySleep.efficiency}%</p>
+                      </div>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 7-day readiness trend */}
+              {ouraReadiness.length > 1 && (
+                <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-4">Readiness Trend</p>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <AreaChart data={ouraReadiness.slice(-7).map(d => ({ date: fmtDate(d.day), value: d.score }))} margin={{top:4,right:4,left:0,bottom:0}}>
+                      <defs>
+                        <linearGradient id="ouraGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#818cf8" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                      <XAxis dataKey="date" tick={{fill:'#52525b',fontSize:10,fontFamily:'monospace'}} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0,100]} tick={{fill:'#52525b',fontSize:10,fontFamily:'monospace'}} axisLine={false} tickLine={false} width={28} />
+                      <Tooltip content={<CustomTooltip unit="" />} />
+                      <ReferenceLine y={85} stroke="#34d399" strokeDasharray="4 3" strokeOpacity={0.3} />
+                      <ReferenceLine y={70} stroke="#f59e0b" strokeDasharray="4 3" strokeOpacity={0.3} />
+                      <Area type="monotone" dataKey="value" name="Score" stroke="#818cf8" strokeWidth={2} fill="url(#ouraGrad)" dot={{fill:'#818cf8',r:3,strokeWidth:0}} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
 
     </div>
   );
