@@ -130,9 +130,15 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
 
   async function completeTask(task: Task) {
     if (task.recurrence === 'daily') {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const due_date = tomorrow.toISOString().split('T')[0];
+      const next = new Date();
+      next.setDate(next.getDate() + 1);
+      const due_date = next.toISOString().split('T')[0];
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, due_date } : t));
+      await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, completed: false, due_date }) });
+    } else if (task.recurrence === 'monthly') {
+      const base = task.due_date ? new Date(task.due_date + 'T00:00:00') : new Date();
+      base.setMonth(base.getMonth() + 1);
+      const due_date = base.toISOString().split('T')[0];
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, due_date } : t));
       await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, completed: false, due_date }) });
     } else {
@@ -205,10 +211,11 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
 
   const nwCurrent = netWorthSnaps.length > 0 ? netWorthSnaps[netWorthSnaps.length - 1] : null;
   const nwPrev    = netWorthSnaps.length > 1 ? netWorthSnaps[netWorthSnaps.length - 2] : null;
+  const LIABILITY_CATS = ['liability', 'credit_card', 'auto_loan', 'personal_loan'];
   function nwTotal(snap: typeof nwCurrent) {
     if (!snap) return 0;
-    const assets = snap.accounts.filter(a => a.category !== 'liability').reduce((s, a) => s + a.balance, 0);
-    const liabs  = snap.accounts.filter(a => a.category === 'liability').reduce((s, a) => s + a.balance, 0);
+    const assets = snap.accounts.filter(a => !LIABILITY_CATS.includes(a.category)).reduce((s, a) => s + a.balance, 0);
+    const liabs  = snap.accounts.filter(a =>  LIABILITY_CATS.includes(a.category)).reduce((s, a) => s + a.balance, 0);
     return assets - liabs;
   }
   const nwValue  = nwTotal(nwCurrent);
@@ -356,7 +363,7 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
             </div>
             {nwChange !== null && (
               <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">WoW Change</p>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Since Last Snapshot</p>
                 <p className={`text-2xl font-bold tabular-nums ${nwChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {nwChange >= 0 ? '+' : ''}${Math.abs(nwChange).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                 </p>
