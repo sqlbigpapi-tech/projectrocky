@@ -27,7 +27,7 @@ type OuraActivity = {
   equivalent_walking_distance: number;
   high_activity_time: number; medium_activity_time: number;
   low_activity_time: number; sedentary_time: number;
-  inactivity_alerts: number;
+  resting_time: number; inactivity_alerts: number;
   contributors: Record<string, number>;
 };
 
