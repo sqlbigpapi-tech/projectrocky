@@ -69,7 +69,6 @@ type WeatherCurrent = { temp: number; feelsLike: number; condition: string; code
 type Task = { id: string; title: string; priority: string; due_date: string | null; category: string; completed: boolean; recurrence: string | null };
 type NewsItem = { title: string; link: string; source: string; pubDate: string; category: string };
 type IncomeMonth = { month: number; plan: number; actual: number | null; is_forecast: boolean };
-type HealthRow = { date: string; metric: string; qty: number | null; unit: string };
 
 const FL_COMPANIES = [
   { name: 'Publix Super Markets',   city: 'Lakeland',        revenue: '$58.5B', linkedin: 'https://www.linkedin.com/company/publix-super-markets' },
@@ -125,7 +124,6 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
   const [news, setNews] = useState<NewsItem[]>([]);
   const [incomeMonths, setIncomeMonths] = useState<IncomeMonth[]>([]);
   const [bigIncomeGoal, setBigIncomeGoal] = useState(1700000);
-  const [healthRows, setHealthRows] = useState<HealthRow[]>([]);
   const [netWorthSnaps, setNetWorthSnaps] = useState<{ id: string; date: string; accounts: { category: string; balance: number }[] }[]>([]);
   const [now, setNow] = useState(new Date());
   const [mounted, setMounted] = useState(false);
@@ -158,7 +156,6 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
     } catch {}
 
     fetch('/api/news').then(r => r.json()).then(d => setNews(d.articles ?? [])).catch(() => {});
-    fetch('/api/health').then(r => r.json()).then(d => setHealthRows(d.metrics ?? [])).catch(() => {});
     fetch('/api/net-worth').then(r => r.json()).then(d => setNetWorthSnaps(d.snapshots ?? [])).catch(() => {});
     fetch('/api/income').then(r => r.json()).then(d => setIncomeMonths(d.months ?? [])).catch(() => {});
     fetch('/api/settings?key=big_uip_goal').then(r => r.json()).then(d => { if (d.value) setBigIncomeGoal(Number(d.value)); }).catch(() => {});
@@ -249,13 +246,6 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
     }
   }
 
-  function latestHealth(metric: string) {
-    return [...healthRows].filter(r => r.metric === metric && r.qty != null).sort((a, b) => b.date.localeCompare(a.date))[0]?.qty ?? null;
-  }
-  const todaySteps    = latestHealth('step_count');
-  const todayHRV      = latestHealth('heart_rate_variability');
-  const todayCalories = latestHealth('active_energy');
-  const todayExercise = latestHealth('apple_exercise_time');
 
   if (!mounted) return null;
 
@@ -380,31 +370,6 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
         </div>
       )}
 
-      {/* ── Health Snapshot ── */}
-      {healthRows.length > 0 && (
-        <div className="rounded-2xl border border-rose-600/20 bg-gradient-to-br from-rose-950/20 via-zinc-950 to-zinc-950 px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-rose-400/70 uppercase tracking-[0.3em] font-mono">Apple Health · Today</p>
-            <button onClick={() => onNavigate?.('health')} className="text-xs text-zinc-600 font-mono hover:text-rose-400 transition-colors">health →</button>
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: 'Steps', value: todaySteps != null ? Math.round(todaySteps).toLocaleString() : '—', icon: '👟', color: 'text-emerald-400' },
-              { label: 'HRV', value: todayHRV != null ? `${Math.round(todayHRV)}ms` : '—', icon: '🫀', color: 'text-violet-400' },
-              { label: 'Active Cal', value: todayCalories != null ? `${Math.round(todayCalories)}` : '—', icon: '🔥', color: 'text-amber-400' },
-              { label: 'Exercise', value: todayExercise != null ? `${Math.round(todayExercise)}min` : '—', icon: '🏃', color: 'text-green-400' },
-            ].map(m => (
-              <div key={m.label} className="bg-zinc-950/60 rounded-xl border border-zinc-800 p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-sm">{m.icon}</span>
-                  <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest">{m.label}</p>
-                </div>
-                <p className={`text-lg font-bold tabular-nums ${m.color}`}>{m.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Row: Tasks + Sports ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
