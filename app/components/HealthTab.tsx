@@ -381,18 +381,22 @@ export default function HealthTab() {
           <p className="text-xs text-red-400 font-mono">{ouraError}</p>
         )}
 
-        {ouraSleep.length > 0 && (() => {
-          const todaySleep = ouraSleep[ouraSleep.length - 1];
-          const todayReadiness = ouraReadiness[ouraReadiness.length - 1];
-          const todayActivity = ouraActivity[ouraActivity.length - 1];
+        {!ouraNoToken && !ouraError && (() => {
+          const todaySleep     = ouraSleep.length     > 0 ? ouraSleep[ouraSleep.length - 1]         : null;
+          const todayReadiness = ouraReadiness.length > 0 ? ouraReadiness[ouraReadiness.length - 1] : null;
+          const todayActivity  = ouraActivity.length  > 0 ? ouraActivity[ouraActivity.length - 1]   : null;
 
-          const avgHRV7 = ouraSleep.slice(-7).reduce((s, d) => s + (d.average_hrv ?? 0), 0) / Math.min(7, ouraSleep.length);
+          const avgHRV7 = ouraSleep.length > 0
+            ? ouraSleep.slice(-7).reduce((s, d) => s + (d.average_hrv ?? 0), 0) / Math.min(7, ouraSleep.length)
+            : 0;
+
+          const hasAnyData = todaySleep || todayReadiness || todayActivity;
 
           return (
             <div className="space-y-5">
               {/* Score rings row */}
               <div className="grid grid-cols-3 gap-4">
-                {todayReadiness && (
+                {todayReadiness ? (
                   <div className="flex flex-col items-center gap-2">
                     <ScoreRing score={todayReadiness.score} color={scoreColor(todayReadiness.score)} />
                     <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Readiness</p>
@@ -400,19 +404,40 @@ export default function HealthTab() {
                       <p className="text-xs text-zinc-600 font-mono">{todayReadiness.temperature_deviation > 0 ? '+' : ''}{todayReadiness.temperature_deviation.toFixed(2)}°C</p>
                     )}
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 opacity-30">
+                    <div className="w-[72px] h-[72px] rounded-full border-4 border-zinc-700 flex items-center justify-center">
+                      <span className="text-xs text-zinc-600 font-mono">—</span>
+                    </div>
+                    <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Readiness</p>
+                  </div>
                 )}
-                {todaySleep && (
+                {todaySleep ? (
                   <div className="flex flex-col items-center gap-2">
                     <ScoreRing score={todaySleep.score} color={scoreColor(todaySleep.score)} />
                     <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Sleep</p>
                     <p className="text-xs text-zinc-600 font-mono">{secToHM(todaySleep.total_sleep_duration)}</p>
                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 opacity-30">
+                    <div className="w-[72px] h-[72px] rounded-full border-4 border-zinc-700 flex items-center justify-center">
+                      <span className="text-xs text-zinc-600 font-mono">—</span>
+                    </div>
+                    <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Sleep</p>
+                  </div>
                 )}
-                {todayActivity && (
+                {todayActivity ? (
                   <div className="flex flex-col items-center gap-2">
                     <ScoreRing score={todayActivity.score} color={scoreColor(todayActivity.score)} />
                     <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Activity</p>
                     <p className="text-xs text-zinc-600 font-mono">{todayActivity.steps.toLocaleString()} steps</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 opacity-30">
+                    <div className="w-[72px] h-[72px] rounded-full border-4 border-zinc-700 flex items-center justify-center">
+                      <span className="text-xs text-zinc-600 font-mono">—</span>
+                    </div>
+                    <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Activity</p>
                   </div>
                 )}
               </div>
@@ -477,6 +502,14 @@ export default function HealthTab() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* First-night prompt */}
+              {!hasAnyData && (
+                <p className="text-sm text-zinc-500 font-mono">Connected ✓ — sleep and readiness data will appear after your first night wearing the ring.</p>
+              )}
+              {!todaySleep && hasAnyData && (
+                <p className="text-xs text-zinc-600 font-mono">Sleep data appears after your first night with the ring.</p>
               )}
 
               {/* 7-day readiness trend */}
