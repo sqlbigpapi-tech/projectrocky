@@ -15,12 +15,9 @@ async function getValidToken(db: ReturnType<typeof import('@/lib/supabase').getS
   const expiresAt    = Number(byKey['oura_expires_at'] ?? 0);
 
   if (!accessToken) return null;
-
-  // Token still valid (with 5 min buffer)
   if (Date.now() < expiresAt - 300_000) return accessToken;
-
-  // Try to refresh
   if (!refreshToken) return null;
+
   const res = await fetch('https://api.ouraring.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -56,12 +53,11 @@ async function ouraFetch(path: string, token: string, startDate: string, endDate
 export async function GET() {
   const db = getSupabase();
   const token = await getValidToken(db);
-
   if (!token) return NextResponse.json({ error: 'no_token' }, { status: 200 });
 
   const end = new Date();
   const start = new Date();
-  start.setDate(start.getDate() - 14);
+  start.setDate(start.getDate() - 30);
   const startDate = start.toISOString().split('T')[0];
   const endDate   = end.toISOString().split('T')[0];
 
