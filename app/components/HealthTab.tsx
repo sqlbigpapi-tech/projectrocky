@@ -109,8 +109,6 @@ export default function HealthTab() {
   const [ouraActivity, setOuraActivity] = useState<OuraActivity[]>([]);
   const [ouraError, setOuraError] = useState('');
   const [ouraNoToken, setOuraNoToken] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
-  const [savingToken, setSavingToken] = useState(false);
 
   useEffect(() => {
     fetch('/api/health')
@@ -128,26 +126,6 @@ export default function HealthTab() {
       })
       .catch(() => setOuraError('Failed to load Oura data'));
   }, []);
-
-  async function saveOuraToken() {
-    if (!tokenInput.trim()) return;
-    setSavingToken(true);
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'oura_token', value: tokenInput.trim() }),
-    });
-    setSavingToken(false);
-    setOuraNoToken(false);
-    setTokenInput('');
-    // Reload Oura data
-    fetch('/api/oura').then(r => r.json()).then(d => {
-      if (d.error) { setOuraError(d.error); return; }
-      setOuraReadiness(d.readiness ?? []);
-      setOuraSleep(d.sleep ?? []);
-      setOuraActivity(d.activity ?? []);
-    });
-  }
 
   if (loading) return (
     <div className="space-y-4">
@@ -386,30 +364,16 @@ export default function HealthTab() {
       <div className="rounded-2xl border border-indigo-600/20 bg-gradient-to-br from-indigo-950/20 via-zinc-950 to-zinc-950 p-5">
         <p className="text-xs text-indigo-400/70 uppercase tracking-[0.3em] font-mono mb-4">Oura Ring</p>
 
-        {/* Token setup */}
+        {/* OAuth connect */}
         {ouraNoToken && (
-          <div className="space-y-4">
+          <div className="flex flex-col items-start gap-4">
             <p className="text-sm text-zinc-400">Connect your Oura Ring to see readiness, sleep, and recovery data.</p>
-            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-400 font-mono space-y-2">
-              <p className="text-white font-bold mb-2">Setup:</p>
-              <p>1. Go to <span className="text-indigo-400">cloud.ouraring.com</span></p>
-              <p>2. Account → Personal Access Tokens</p>
-              <p>3. Create a new token and paste it below</p>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={tokenInput}
-                onChange={e => setTokenInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && saveOuraToken()}
-                placeholder="Paste personal access token…"
-                className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500/50 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none transition font-mono"
-              />
-              <button onClick={saveOuraToken} disabled={savingToken || !tokenInput.trim()}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-lg transition">
-                {savingToken ? 'Saving…' : 'Connect'}
-              </button>
-            </div>
+            <a
+              href="/api/oura/login"
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm px-5 py-2.5 rounded-lg transition"
+            >
+              Connect Oura Ring →
+            </a>
           </div>
         )}
 
