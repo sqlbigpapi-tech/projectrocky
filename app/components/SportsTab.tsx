@@ -20,12 +20,15 @@ type GameInfo = {
 
 type NewsItem = { id: string; type: string; headline: string; image: string; link: string; published: string };
 
+type Standings = { divisionGB: string; leagueGB: string; playoffSeed: number; record: string; streak: string };
+
 type TeamFeed = {
   team: { id: string; name: string; abbr: string; logo: string; league: string; record: string | null };
   liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
   news: NewsItem[];
+  standings: Standings | null;
 };
 
 const LEAGUE_OPTIONS = [
@@ -94,7 +97,9 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
     );
   }
 
-  const { team, liveGame, lastGame, nextGame, news } = feed;
+  const { team, liveGame, lastGame, nextGame, news, standings } = feed;
+  // Make feed accessible for standings display
+  const feedData = feed;
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
 
   return (
@@ -114,9 +119,27 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
                 <span className="text-xs text-zinc-500 font-mono tabular-nums">{team.record}</span>
               )}
             </div>
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
-              {team.league}
-            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
+                {team.league}
+              </span>
+              {standings && (
+                <span className="text-xs text-zinc-500 font-mono">
+                  {standings.divisionGB === '-' ? (
+                    <span className="text-emerald-400">1st in Division</span>
+                  ) : (
+                    <span>{standings.divisionGB} GB Div</span>
+                  )}
+                  {standings.leagueGB !== '-' && standings.divisionGB !== '-' && (
+                    <span className="text-zinc-600"> · {standings.leagueGB} GB WC</span>
+                  )}
+                  {standings.leagueGB === '-' && standings.divisionGB !== '-' && (
+                    <span className="text-amber-400"> · WC Spot</span>
+                  )}
+                  {standings.streak && <span className="text-zinc-600"> · {standings.streak}</span>}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <button onClick={onRemove} className="text-zinc-700 hover:text-red-400 text-xs transition">✕</button>

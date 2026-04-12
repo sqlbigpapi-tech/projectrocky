@@ -24,34 +24,34 @@ type Snapshot = {
 
 const DEFAULT_ACCOUNTS: Account[] = [
   // Business Equity
-  { id: 'sei_shares',       name: 'SEI-Miami LLC Shares',             category: 'business',      balance: 773776.43 },
+  { id: 'sei_shares',       name: 'SEI-Miami LLC Shares',             category: 'business',      balance: 888797.00 },
   // Depository
   { id: 'cd',               name: 'Certificate of Deposit',           category: 'depository',    balance: 259296.65 },
   { id: 'money_market',     name: 'Premiere Money Market',            category: 'depository',    balance: 36479.68  },
-  { id: 'spend',            name: 'Spend Account',                    category: 'depository',    balance: 20286.82  },
-  { id: 'hysa',             name: 'High Yield Savings Account',       category: 'depository',    balance: 123.04    },
+  { id: 'spend',            name: 'Spend Account',                    category: 'depository',    balance: 8524.19   },
+  { id: 'hysa',             name: 'High Yield Savings Account',       category: 'depository',    balance: 129.94    },
   // Retirement & Investments
-  { id: 'ira',              name: 'IRA',                              category: 'retirement',    balance: 208679.41 },
-  { id: 'sei_401k',         name: 'SEI 401(k) Plan',                  category: 'retirement',    balance: 59486.19  },
-  { id: 'joint',            name: 'Joint Account',                    category: 'retirement',    balance: 3817.63   },
+  { id: 'ira',              name: 'IRA',                              category: 'retirement',    balance: 215201.82 },
+  { id: 'sei_401k',         name: 'SEI 401(k) Plan',                  category: 'retirement',    balance: 61771.14  },
+  { id: 'joint',            name: 'Joint Account',                    category: 'retirement',    balance: 3955.69   },
   { id: 'hsa',              name: 'Health Savings Account',           category: 'retirement',    balance: 344.21    },
   { id: 'allegiant_401k',   name: 'Allegiant 401(k) Plan',            category: 'retirement',    balance: 0         },
   // Credit Cards
   { id: 'sw_cc',            name: 'Southwest Rapid Rewards',          category: 'credit_card',   balance: 16000.00, priority: true },
-  { id: 'amex_plat',        name: 'Amex Platinum',                    category: 'credit_card',   balance: 6121.63   },
+  { id: 'amex_plat',        name: 'Amex Platinum',                    category: 'credit_card',   balance: 6599.27   },
   { id: 'chase_4985',       name: 'Chase Ultimate Rewards (4985)',    category: 'credit_card',   balance: 4601.14   },
-  { id: 'chase_prime',      name: 'Chase Prime Visa',                 category: 'credit_card',   balance: 4472.66   },
+  { id: 'chase_prime',      name: 'Chase Prime Visa',                 category: 'credit_card',   balance: 6142.38   },
   { id: 'amex_blue',        name: 'Amex Blue Cash Preferred',         category: 'credit_card',   balance: 3553.68   },
-  { id: 'delta_skymiles',   name: 'Delta SkyMiles Reserve',           category: 'credit_card',   balance: 1151.90   },
-  { id: 'citi_simplicity',  name: 'Citi Simplicity',                  category: 'credit_card',   balance: 168.66    },
-  { id: 'chase_9970',       name: 'Chase Ultimate Rewards (9970)',    category: 'credit_card',   balance: 50.00     },
+  { id: 'delta_skymiles',   name: 'Delta SkyMiles Reserve',           category: 'credit_card',   balance: 1212.79   },
+  { id: 'citi_simplicity',  name: 'Citi Simplicity',                  category: 'credit_card',   balance: 203.09    },
+  { id: 'chase_9970',       name: 'Chase Ultimate Rewards (9970)',    category: 'credit_card',   balance: 138.45    },
   // Auto Loans
   { id: 'mercedes',         name: '2020 Mercedes-Benz (Ally)',        category: 'auto_loan',     balance: 25468.68  },
   { id: 'bmw',              name: '2018 BMW X1 (Ally)',               category: 'auto_loan',     balance: 19390.41  },
   // Personal Loans
   { id: 'pl_3084',          name: 'PL Loan Card (3084)',              category: 'personal_loan', balance: 36981.00  },
   { id: 'pl_1869',          name: 'PL Loan Card (1869)',              category: 'personal_loan', balance: 16858.60  },
-  { id: 'pl_0419',          name: 'PL Loan Card (0419)',              category: 'personal_loan', balance: 2069.90   },
+  { id: 'pl_0419',          name: 'PL Loan Card (0419)',              category: 'personal_loan', balance: 0         },
 ];
 
 
@@ -110,20 +110,40 @@ export default function NetWorthTab() {
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [assumptionsSaving, setAssumptionsSaving] = useState(false);
 
+  const [myShares, setMyShares] = useState(2100.01);
+  const [seiSharePrice, setSeiSharePrice] = useState<number | null>(null);
+
+  function applySharePrice(accounts: Account[], price: number, shares?: number): Account[] {
+    const s = shares ?? myShares;
+    return accounts.map(a =>
+      a.id === 'sei_shares' ? { ...a, balance: Math.round(s * price * 100) / 100 } : a
+    );
+  }
+
   useEffect(() => {
     setMounted(true);
-    fetch('/api/net-worth')
-      .then(r => r.json())
-      .then(d => {
-        const snaps: Snapshot[] = (d.snapshots ?? []).map((s: any) => ({
-          id: s.id,
-          date: s.date,
-          accounts: s.accounts as Account[],
-        }));
-        setSnapshots(snaps);
-        setEditing(snaps.length > 0 ? snaps[snaps.length - 1].accounts : DEFAULT_ACCOUNTS);
-      })
-      .catch(() => setEditing(DEFAULT_ACCOUNTS));
+
+    Promise.all([
+      fetch('/api/net-worth').then(r => r.json()),
+      fetch('/api/equity?year=2026').then(r => r.json()).catch(() => null),
+      fetch('/api/settings?key=my_sei_shares').then(r => r.json()).catch(() => null),
+    ]).then(([nwData, eqData, sharesData]) => {
+      const sharePrice = eqData?.latest?.sharePrice ?? null;
+      const savedShares = sharesData?.value ? parseFloat(sharesData.value) : 2100.01;
+      setMyShares(savedShares);
+      if (sharePrice) setSeiSharePrice(sharePrice);
+
+      const snaps: Snapshot[] = (nwData.snapshots ?? []).map((s: any) => ({
+        id: s.id,
+        date: s.date,
+        accounts: s.accounts as Account[],
+      }));
+      setSnapshots(snaps);
+
+      let accts = snaps.length > 0 ? snaps[snaps.length - 1].accounts : DEFAULT_ACCOUNTS;
+      if (sharePrice) accts = applySharePrice(accts, sharePrice, savedShares);
+      setEditing(accts);
+    }).catch(() => setEditing(DEFAULT_ACCOUNTS));
 
     fetch('/api/settings?key=nw_assumptions')
       .then(r => r.json())
@@ -144,9 +164,8 @@ export default function NetWorthTab() {
 
   if (!mounted) return null;
 
-  const current = snapshots.length > 0
-    ? snapshots[snapshots.length - 1].accounts
-    : DEFAULT_ACCOUNTS;
+  // Use editing (which has live share price applied) as the current view
+  const current = editing;
 
   const { assets, liabilities, netWorth } = calcTotals(current);
 
@@ -405,17 +424,40 @@ export default function NetWorthTab() {
                         onChange={e => updateName(a.id, e.target.value)}
                         className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-zinc-300 focus:outline-none focus:border-amber-500/50 transition-colors"
                       />
-                      <div className="relative shrink-0">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={a.balance}
-                          onChange={e => updateBalance(a.id, e.target.value)}
-                          className="w-32 pl-7 pr-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-amber-500/50 transition-colors"
-                        />
-                      </div>
+                      {a.id === 'sei_shares' && seiSharePrice ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={myShares}
+                            onChange={e => {
+                              const s = parseFloat(e.target.value) || 0;
+                              setMyShares(s);
+                              setEditing(prev => applySharePrice(prev, seiSharePrice, s));
+                            }}
+                            onBlur={() => {
+                              fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'my_sei_shares', value: String(myShares) }) });
+                            }}
+                            className="w-24 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-amber-400 font-mono tabular-nums focus:outline-none focus:border-amber-500/50 transition-colors"
+                            title="Shares owned"
+                          />
+                          <span className="text-xs text-zinc-600 font-mono">shares</span>
+                          <span className="text-xs text-zinc-600 font-mono">@ ${seiSharePrice.toFixed(2)}</span>
+                          <span className="text-sm text-white font-mono font-bold w-28 text-right">${Math.round(a.balance).toLocaleString()}</span>
+                        </div>
+                      ) : (
+                        <div className="relative shrink-0">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={a.balance}
+                            onChange={e => updateBalance(a.id, e.target.value)}
+                            className="w-32 pl-7 pr-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-amber-500/50 transition-colors"
+                          />
+                        </div>
+                      )}
                       <button onClick={() => removeAccount(a.id)} className="text-zinc-700 hover:text-red-400 transition-colors text-lg leading-none shrink-0" title="Remove">×</button>
                     </div>
                   ))}

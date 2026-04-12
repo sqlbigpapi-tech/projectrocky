@@ -192,6 +192,7 @@ export default function HealthTab() {
   const [noToken,   setNoToken]   = useState(false);
   const [error,     setError]     = useState('');
   const [range,     setRange]     = useState<7 | 14 | 30>(14);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     fetch('/api/oura')
@@ -202,6 +203,7 @@ export default function HealthTab() {
         setReadiness(d.readiness ?? []);
         setSleep(d.sleep ?? []);
         setActivity(d.activity ?? []);
+        setFetchedAt(new Date());
       })
       .catch(() => setError('Failed to load'))
       .finally(() => setLoading(false));
@@ -302,7 +304,12 @@ export default function HealthTab() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xl font-bold text-white">Health</p>
-          <p className="text-xs text-zinc-500 font-mono mt-0.5">{dateLabel} · Oura Ring</p>
+          <p className="text-xs text-zinc-500 font-mono mt-0.5">
+            {dateLabel} · Oura Ring
+            {fetchedAt && (
+              <span className="text-zinc-500"> · fetched {fetchedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
           {([7, 14, 30] as const).map(d => (

@@ -1,15 +1,18 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 
-const GOAL = 1001000;
+const GOAL_MIA = 1001000; // fallback for when months haven't loaded yet
 const DEFAULT_bigGoal = 1700000;
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MARKETS = ['ATL','BOS','CHI','CIN','CLT','DAL','MIA','NSH','NYC','PHL','PHX','SEA','WDC'] as const;
+type Market = typeof MARKETS[number];
 
 type MonthData = {
   month: number;
   plan: number;
   actual: number | null;
   is_forecast: boolean;
+  revenue: number | null;
 };
 
 function fmt(n: number | null): string {
@@ -77,6 +80,7 @@ function EditRow({
 }
 
 export default function IncomeTab() {
+  const [market, setMarket] = useState<Market>('MIA');
   const [months, setMonths] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<number | null>(null);
@@ -91,14 +95,21 @@ export default function IncomeTab() {
   const [recsGeneratedAt, setRecsGeneratedAt] = useState('');
 
   useEffect(() => {
-    fetch('/api/income')
+    setLoading(true);
+    setEditing(null);
+    fetch(`/api/income?market=${market}`)
       .then(r => r.json())
       .then(d => setMonths(d.months ?? []))
       .finally(() => setLoading(false));
-    fetch('/api/settings?key=big_uip_goal')
+  }, [market]);
+
+  useEffect(() => {
+    setBigGoal(DEFAULT_bigGoal);
+    fetch(`/api/settings?key=big_uip_goal_${market}`)
       .then(r => r.json())
       .then(d => { if (d.value) setBigGoal(Number(d.value)); });
-  }, []);
+  }, [market]);
+
 
   async function saveBigGoal() {
     const n = parseFloat(bigGoalInput.replace(/[^0-9.]/g, ''));
@@ -107,7 +118,7 @@ export default function IncomeTab() {
       await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'big_uip_goal', value: String(n) }),
+        body: JSON.stringify({ key: `big_uip_goal_${market}`, value: String(n) }),
       });
     }
     setEditingBigGoal(false);
@@ -119,7 +130,7 @@ export default function IncomeTab() {
     const res = await fetch('/api/income', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month, actual, is_forecast }),
+      body: JSON.stringify({ month, actual, is_forecast, market }),
     });
     const { month: updated } = await res.json();
     setMonths(prev => prev.map(m => m.month === month ? { ...m, ...updated } : m));
@@ -152,7 +163,7 @@ export default function IncomeTab() {
     const res = await fetch('/api/income', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ month, actual: null, is_forecast: false }),
+      body: JSON.stringify({ month, actual: null, is_forecast: false, market }),
     });
     const { month: updated } = await res.json();
     setMonths(prev => prev.map(m => m.month === month ? { ...m, ...updated } : m));
@@ -160,6 +171,7 @@ export default function IncomeTab() {
   }
 
   // Derived stats
+  const GOAL = months.length > 0 ? months.reduce((s, m) => s + m.plan, 0) : GOAL_MIA;
   const locked = months.filter(m => m.actual != null);
   const actuals = months.filter(m => m.actual != null && !m.is_forecast);
   const forecasts = months.filter(m => m.actual != null && m.is_forecast);
@@ -171,6 +183,7 @@ export default function IncomeTab() {
   const beat = ytd - planYtd;
   const best = locked.length > 0 ? locked.reduce((a, b) => (b.actual ?? 0) > (a.actual ?? 0) ? b : a) : null;
   const runRate = locked.length > 0 ? ytd / locked.length : 0;
+  const ytdRevenue = months.filter(m => m.revenue != null).reduce((s, m) => s + (m.revenue ?? 0), 0);
 
   const actualTotal = actuals.reduce((s, m) => s + (m.actual ?? 0), 0);
   const forecastTotal = forecasts.reduce((s, m) => s + (m.actual ?? 0), 0);
@@ -218,27 +231,49 @@ export default function IncomeTab() {
       {/* Header */}
       <div className="rounded-2xl border border-emerald-600/20 overflow-hidden bg-gradient-to-br from-emerald-950/20 via-zinc-950 to-zinc-950">
         <div className="p-6">
-          <p className="text-xs text-emerald-400/70 uppercase tracking-[0.3em] font-mono mb-3">SEI Miami · Net Income Tracker</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-emerald-400/70 uppercase tracking-[0.3em] font-mono">SEI {market} · Net Income Tracker</p>
+            <div className="flex flex-wrap gap-1">
+              {MARKETS.map(m => (
+                <button key={m} onClick={() => setMarket(m)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono tracking-widest transition ${
+                    market === m
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'text-zinc-600 hover:text-zinc-300 border border-transparent'
+                  }`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-end justify-between gap-4 mb-5">
-            <div>
-              <p className="text-4xl font-bold text-emerald-400 tabular-nums tracking-tight">{fmtFull(ytd)}</p>
-              <p className="text-xs text-zinc-500 font-mono mt-1">YTD net income</p>
+            <div className="flex gap-8 items-end">
+              <div>
+                <p className="text-4xl font-bold text-emerald-400 tabular-nums tracking-tight">{fmtFull(ytd)}</p>
+                <p className="text-xs text-zinc-500 font-mono mt-1">YTD net income</p>
+              </div>
+              {ytdRevenue > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-blue-400 tabular-nums tracking-tight">{fmtFull(ytdRevenue)}</p>
+                  <p className="text-xs text-zinc-500 font-mono mt-1">YTD revenue</p>
+                </div>
+              )}
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-zinc-300 tabular-nums">{pct.toFixed(1)}%</p>
-              <p className="text-xs text-zinc-500 font-mono mt-1">of $1M goal</p>
+              <p className="text-xs text-zinc-500 font-mono mt-1">of {fmt(GOAL)} plan</p>
             </div>
           </div>
 
-          {/* $1M Goal Progress */}
-          <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-1.5">$1M Goal</p>
+          {/* Plan Goal Progress */}
+          <p className="text-xs text-zinc-600 font-mono uppercase tracking-widest mb-1.5">{fmt(GOAL)} Plan</p>
           <div className="relative h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
             <div className="absolute left-0 top-0 h-full bg-white/8 rounded-full" style={{ width: `${planPct}%` }} />
             <div className="absolute top-0 h-full bg-emerald-400/30 rounded-full" style={{ left: `${actualPct}%`, width: `${forecastPct}%` }} />
             <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${actualPct}%`, background: 'linear-gradient(90deg, #059669, #34d399)' }} />
           </div>
           <div className="flex items-center gap-4 bg-zinc-900/60 rounded-xl px-4 py-3 border border-zinc-800 mb-4">
-            <p className="text-xs text-zinc-500 font-mono flex-1">Remaining to $1M</p>
+            <p className="text-xs text-zinc-500 font-mono flex-1">Remaining to {fmt(GOAL)}</p>
             <p className="text-lg font-bold text-amber-400 tabular-nums">{fmtFull(remaining)}</p>
             <div className="text-right text-xs font-mono">
               <p className="text-zinc-500">{fmt(remainingMonths > 0 ? remaining / remainingMonths : 0)}/mo needed</p>
@@ -297,7 +332,7 @@ export default function IncomeTab() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Vs Plan YTD', value: (beat >= 0 ? '+' : '') + fmt(beat), sub: `vs ${fmt(planYtd)} plan`, color: beat >= 0 ? 'text-emerald-400' : 'text-amber-400' },
-          { label: 'Months Locked', value: `${locked.length} of 12`, sub: locked.map(m => MONTH_NAMES[m.month - 1].slice(0, 3)).join(', ') || 'none', color: 'text-white' },
+          { label: '% of Plan', value: planYtd > 0 ? (ytd / planYtd * 100).toFixed(1) + '%' : '—', sub: `${fmt(ytd)} actual vs ${fmt(planYtd)} plan`, color: ytd >= planYtd ? 'text-emerald-400' : 'text-amber-400' },
           { label: 'Best Month', value: best ? fmt(best.actual) : '—', sub: best ? MONTH_NAMES[best.month - 1] : '—', color: 'text-amber-400' },
           { label: 'Run Rate Avg', value: fmt(runRate), sub: 'per locked month', color: 'text-blue-400' },
         ].map(kpi => (
@@ -319,7 +354,7 @@ export default function IncomeTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800">
-                {['Month', 'Plan', 'Actual / Forecast', 'vs Plan', 'Running Total', '% $1M', `% ${fmt(bigGoal)}`, ''].map((h, i) => (
+                {['Month', 'Plan', 'Actual / Forecast', 'vs Plan', 'Running Total', `% ${fmt(GOAL)}`, `% ${fmt(bigGoal)}`, ''].map((h, i) => (
                   <th key={i} className={`px-5 py-2.5 text-xs font-mono text-zinc-600 uppercase tracking-widest font-medium ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                 ))}
               </tr>
@@ -435,7 +470,7 @@ export default function IncomeTab() {
                 </p>
                 <div className="mt-2 flex flex-col gap-1">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-zinc-600">$1M goal</span>
+                    <span className="text-zinc-600">{fmt(GOAL)} plan</span>
                     <span className={over >= 0 ? 'text-emerald-400' : 'text-amber-400'}>
                       {(projected / GOAL * 100).toFixed(0)}% {over >= 0 ? '(' + fmt(over) + ' over)' : '(' + fmt(Math.abs(over)) + ' short)'}
                     </span>
@@ -479,7 +514,7 @@ export default function IncomeTab() {
                     <p className="text-2xl font-bold text-white tabular-nums mb-2">{fmtFull(Math.round(projected))}</p>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center justify-between text-xs font-mono">
-                        <span className="text-zinc-600">$1M goal</span>
+                        <span className="text-zinc-600">{fmt(GOAL)} plan</span>
                         <span className={over! >= 0 ? 'text-emerald-400' : 'text-amber-400'}>
                           {(projected / GOAL * 100).toFixed(0)}% {over! >= 0 ? '(' + fmt(over!) + ' over)' : '(' + fmt(Math.abs(over!)) + ' short)'}
                         </span>

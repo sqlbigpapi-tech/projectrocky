@@ -152,6 +152,36 @@ export async function GET(request: Request) {
         published: a.published,
       }));
 
+    // Fetch standings for MLB teams
+    let standings: { divisionGB: string; leagueGB: string; playoffSeed: number; record: string; streak: string } | null = null;
+    if (league === 'mlb') {
+      try {
+        const standingsRes = await fetch(
+          `https://site.api.espn.com/apis/v2/sports/${sport}/${league}/standings`,
+          { next: { revalidate: 3600 } }
+        );
+        const standingsData = await standingsRes.json();
+        for (const conf of standingsData.children ?? []) {
+          const entries: any[] = conf.standings?.entries ?? [];
+          const entry = entries.find((e: any) => String(e.team?.id) === teamId);
+          if (entry) {
+            const stats: Record<string, string> = {};
+            for (const s of entry.stats ?? []) {
+              stats[s.name] = s.displayValue ?? String(s.value ?? '');
+            }
+            standings = {
+              divisionGB: stats.divisionGamesBehind ?? '—',
+              leagueGB: stats.gamesBehind ?? '—',
+              playoffSeed: parseInt(stats.playoffSeed ?? '0'),
+              record: stats.overall ?? '',
+              streak: stats.streak ?? '',
+            };
+            break;
+          }
+        }
+      } catch { /* not critical */ }
+    }
+
     return NextResponse.json({
       team: {
         id: str(team.id),
@@ -165,6 +195,7 @@ export async function GET(request: Request) {
       lastGame: parseGame(lastEvent),
       nextGame,
       news,
+      standings,
     });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch team data' }, { status: 500 });

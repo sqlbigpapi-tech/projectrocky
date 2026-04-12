@@ -11,6 +11,7 @@ const DEFAULT_TEAMS: FollowedTeam[] = [
   { sport: 'football',   league: 'nfl', teamId: '19' },
 ];
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const LEAGUE_COLORS: Record<string, string> = {
   NFL: 'text-red-400', NBA: 'text-orange-400', MLB: 'text-blue-400', NCAAF: 'text-green-400',
 };
@@ -69,14 +70,8 @@ type WeatherCurrent = { temp: number; feelsLike: number; condition: string; code
 type Task = { id: string; title: string; priority: string; due_date: string | null; category: string; completed: boolean; recurrence: string | null };
 type NewsItem = { title: string; link: string; source: string; pubDate: string; category: string };
 type IncomeMonth = { month: number; plan: number; actual: number | null; is_forecast: boolean };
+type OuraDay = { day: string; score: number; steps?: number; active_calories?: number; total_sleep_duration?: number };
 
-const FL_COMPANIES = [
-  { name: 'Publix Super Markets',   city: 'Lakeland',        revenue: '$58.5B', linkedin: 'https://www.linkedin.com/company/publix-super-markets' },
-  { name: 'TD SYNNEX',              city: 'Clearwater',      revenue: '$57.6B', linkedin: 'https://www.linkedin.com/company/td-synnex' },
-  { name: 'Jabil',                  city: 'St. Petersburg',  revenue: '$34.7B', linkedin: 'https://www.linkedin.com/company/jabil' },
-  { name: 'Lennar Corporation',     city: 'Miami',           revenue: '$34.2B', linkedin: 'https://www.linkedin.com/company/lennar' },
-  { name: 'AutoNation',             city: 'Fort Lauderdale', revenue: '$26.1B', linkedin: 'https://www.linkedin.com/company/autonation' },
-];
 
 function weatherIcon(code: number): string {
   if (code === 0) return '☀️';
@@ -116,7 +111,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   'South Florida': 'text-teal-400',
 };
 
-export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'networth') => void }) {
+type NavTab = 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'networth' | 'finmodel' | 'headcount' | 'equity';
+type EquitySummary = { sharePrice: number; valuation: number; trailing12: number; month: number; isForecast: boolean };
+type EndingSoonItem = { consultantName: string; client: string; sowEnd: string; annualTotal: number };
+
+export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab) => void }) {
   const [weather, setWeather] = useState<WeatherCurrent | null>(null);
   const [followedTeams, setFollowedTeams] = useState<FollowedTeam[]>(DEFAULT_TEAMS);
   const [teamFeeds, setTeamFeeds] = useState<TeamFeed[]>([]);
@@ -125,6 +124,12 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
   const [incomeMonths, setIncomeMonths] = useState<IncomeMonth[]>([]);
   const [bigIncomeGoal, setBigIncomeGoal] = useState(1700000);
   const [netWorthSnaps, setNetWorthSnaps] = useState<{ id: string; date: string; accounts: { category: string; balance: number }[] }[]>([]);
+  const [ouraActivity, setOuraActivity]   = useState<OuraDay[]>([]);
+  const [ouraReadiness, setOuraReadiness] = useState<OuraDay[]>([]);
+  const [ouraSleep, setOuraSleep]         = useState<OuraDay[]>([]);
+  const [equitySummary, setEquitySummary] = useState<EquitySummary | null>(null);
+  const [endingSoon, setEndingSoon] = useState<EndingSoonItem[]>([]);
+  const [forecastRevenue, setForecastRevenue] = useState<{ month: number; revenue: number }[]>([]);
   const [now, setNow] = useState(new Date());
   const [mounted, setMounted] = useState(false);
 
@@ -154,17 +159,52 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
   }, []);
 
   useEffect(() => {
-    fetch('/api/weather').then(r => r.json()).then(d => setWeather(d.current)).catch(() => {});
-    fetch('/api/tasks').then(r => r.json()).then(d => setTasks(d.tasks ?? [])).catch(() => {});
     try {
       const stored = localStorage.getItem('followed_teams_v1');
       if (stored) setFollowedTeams(JSON.parse(stored));
     } catch {}
 
-    fetch('/api/news').then(r => r.json()).then(d => setNews(d.articles ?? [])).catch(() => {});
-    fetch('/api/net-worth').then(r => r.json()).then(d => setNetWorthSnaps(d.snapshots ?? [])).catch(() => {});
-    fetch('/api/income').then(r => r.json()).then(d => setIncomeMonths(d.months ?? [])).catch(() => {});
-    fetch('/api/settings?key=big_uip_goal').then(r => r.json()).then(d => { if (d.value) setBigIncomeGoal(Number(d.value)); }).catch(() => {});
+    // Fire all API calls in parallel
+    const safe = (p: Promise<Response>) => p.then(r => r.json()).catch(() => null);
+    Promise.all([
+      safe(fetch('/api/weather')),
+      safe(fetch('/api/tasks')),
+      safe(fetch('/api/news')),
+      safe(fetch('/api/net-worth')),
+      safe(fetch('/api/oura')),
+      safe(fetch('/api/income')),
+      safe(fetch('/api/settings?key=big_uip_goal')),
+      safe(fetch('/api/equity?year=2026')),
+      safe(fetch('/api/billing?year=2026')),
+      safe(fetch('/api/pl?year=2026')),
+    ]).then(([weather, tasks, news, nw, oura, income, bigGoalSetting, equity, billing, pl]) => {
+      if (weather?.current) setWeather(weather.current);
+      if (tasks?.tasks) setTasks(tasks.tasks);
+      if (news?.articles) setNews(news.articles);
+      if (nw?.snapshots) setNetWorthSnaps(nw.snapshots);
+      if (oura && !oura.error) {
+        setOuraActivity(oura.activity ?? []);
+        setOuraReadiness(oura.readiness ?? []);
+        setOuraSleep(oura.sleep ?? []);
+      }
+      if (income?.months) setIncomeMonths(income.months);
+      if (bigGoalSetting?.value) setBigIncomeGoal(Number(bigGoalSetting.value));
+      if (equity?.latest) setEquitySummary(equity.latest);
+      if (billing?.forecast) {
+        const forecast = billing.forecast;
+        const today = new Date();
+        const sixtyOut = new Date(today); sixtyOut.setDate(sixtyOut.getDate() + 60);
+        setEndingSoon(forecast.filter((f: any) => {
+          const end = new Date(f.sowEnd);
+          return end >= today && end <= sixtyOut;
+        }).map((f: any) => ({ consultantName: f.consultantName, client: f.client, sowEnd: f.sowEnd, annualTotal: f.annualTotal })));
+      }
+      if (pl?.months) {
+        const currentMonth = new Date().getMonth() + 1;
+        const upcoming = pl.months.filter((m: any) => m.month >= currentMonth && m.month <= currentMonth + 2);
+        setForecastRevenue(upcoming.map((m: any) => ({ month: m.month, revenue: m.revenue })));
+      }
+    });
   }, []);
 
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -253,6 +293,11 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
     }
   }
 
+
+  // Oura today
+  const todayOuraA = ouraActivity.length  > 0 ? ouraActivity[ouraActivity.length   - 1] : null;
+  const todayOuraR = ouraReadiness.length > 0 ? ouraReadiness[ouraReadiness.length - 1] : null;
+  const todayOuraS = ouraSleep.length     > 0 ? ouraSleep[ouraSleep.length         - 1] : null;
 
   if (!mounted) return null;
 
@@ -378,6 +423,71 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
       )}
 
 
+      {/* ── Financial Model Summary ── */}
+      {equitySummary && (
+        <div className="rounded-2xl border border-amber-600/20 overflow-hidden bg-gradient-to-br from-amber-950/20 via-zinc-950 to-zinc-950">
+          <div className="p-5 md:p-6">
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-xs text-amber-400/70 uppercase tracking-[0.3em] font-mono">Financial Model · MIA</p>
+              <div className="flex items-center gap-3">
+                <button onClick={() => onNavigate?.('equity')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">equity →</button>
+                <button onClick={() => onNavigate?.('finmodel')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">model →</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+              <div>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Share Price</p>
+                <p className="text-2xl font-bold text-amber-400 tabular-nums">${equitySummary.sharePrice.toFixed(2)}</p>
+                <p className="text-xs text-zinc-600 font-mono mt-0.5">as of {MONTHS[equitySummary.month - 1]} {equitySummary.isForecast ? '(fcst)' : ''}</p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Valuation</p>
+                <p className="text-2xl font-bold text-white tabular-nums">
+                  {equitySummary.valuation >= 1000000 ? `$${(equitySummary.valuation / 1000000).toFixed(1)}M` : `$${Math.round(equitySummary.valuation / 1000)}K`}
+                </p>
+                <p className="text-xs text-zinc-600 font-mono mt-0.5">5x T12 + retained</p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Trailing 12 NI</p>
+                <p className={`text-2xl font-bold tabular-nums ${equitySummary.trailing12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {equitySummary.trailing12 >= 1000000 ? `$${(equitySummary.trailing12 / 1000000).toFixed(1)}M` : `$${Math.round(equitySummary.trailing12 / 1000)}K`}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Next 3 Mo Revenue</p>
+                <p className="text-2xl font-bold text-zinc-300 tabular-nums">
+                  {forecastRevenue.length > 0 ? `$${Math.round(forecastRevenue.reduce((s, m) => s + m.revenue, 0) / 1000)}K` : '—'}
+                </p>
+                <p className="text-xs text-zinc-600 font-mono mt-0.5">
+                  {forecastRevenue.map(m => MONTHS[m.month - 1]).join(', ')}
+                </p>
+              </div>
+            </div>
+
+            {/* Engagements ending soon */}
+            {endingSoon.length > 0 && (
+              <div className="border-t border-zinc-800/60 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-red-400/70 uppercase tracking-[0.2em] font-mono font-bold">Engagements Ending Within 60 Days</p>
+                  <button onClick={() => onNavigate?.('headcount')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">headcount →</button>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {endingSoon.map((e, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/20">
+                      <span className="text-xs text-white font-bold font-mono">{e.consultantName}</span>
+                      <span className="text-xs text-zinc-500 font-mono">@ {e.client}</span>
+                      <span className="text-xs text-red-400 font-mono">
+                        ends {new Date(e.sowEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Row: Tasks + Sports ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -429,23 +539,41 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: 'briefi
         </div>
       </div>
 
-      {/* ── BD Snapshot ── */}
+      {/* ── Oura Health ── */}
       <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Top FL Companies · BD Targets</p>
-          <button onClick={() => onNavigate?.('bd')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">pipeline →</button>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Recovery · Today</p>
+          <button onClick={() => onNavigate?.('health')} className="text-xs text-zinc-600 font-mono hover:text-cyan-400 transition-colors">health →</button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          {FL_COMPANIES.map((c, i) => (
-            <a key={c.name} href={c.linkedin} target="_blank" rel="noopener noreferrer"
-              className={`rounded-lg border p-3 hover:brightness-110 transition-all ${i === 0 ? 'border-amber-500/30 bg-amber-500/5' : 'border-zinc-800 bg-zinc-900/30'}`}>
-              <p className={`text-xs font-bold font-mono mb-1 ${i === 0 ? 'text-amber-400' : 'text-zinc-600'}`}>#{i + 1}</p>
-              <p className="text-sm font-semibold text-white leading-tight truncate">{c.name}</p>
-              <p className="text-xs text-zinc-500 mt-0.5 truncate">{c.city}</p>
-              <p className={`text-sm font-bold tabular-nums mt-2 ${i === 0 ? 'text-amber-400' : 'text-zinc-300'}`}>{c.revenue}</p>
-            </a>
-          ))}
-        </div>
+        {!todayOuraR && !todayOuraA && !todayOuraS ? (
+          <p className="text-xs text-zinc-600 font-mono py-4 text-center">Connect Oura to see recovery data</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {todayOuraR && (
+              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Readiness</p>
+                <p className={`text-3xl font-bold tabular-nums ${todayOuraR.score >= 85 ? 'text-emerald-400' : todayOuraR.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraR.score}</p>
+                <p className="text-xs text-zinc-600 font-mono">{todayOuraR.score >= 85 ? 'Optimal' : todayOuraR.score >= 70 ? 'Good' : 'Fair'}</p>
+              </div>
+            )}
+            {todayOuraS && (
+              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Sleep</p>
+                <p className={`text-3xl font-bold tabular-nums ${todayOuraS.score >= 85 ? 'text-cyan-400' : todayOuraS.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraS.score}</p>
+                <p className="text-xs text-zinc-600 font-mono">
+                  {todayOuraS.total_sleep_duration ? `${Math.floor(todayOuraS.total_sleep_duration / 3600)}h ${Math.floor((todayOuraS.total_sleep_duration % 3600) / 60)}m` : '—'}
+                </p>
+              </div>
+            )}
+            {todayOuraA && (
+              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Activity</p>
+                <p className={`text-3xl font-bold tabular-nums ${todayOuraA.score >= 85 ? 'text-orange-400' : todayOuraA.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraA.score}</p>
+                <p className="text-xs text-zinc-600 font-mono">{todayOuraA.steps ? `${(todayOuraA.steps / 1000).toFixed(1)}k steps` : '—'}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── News headlines ── */}

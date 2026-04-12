@@ -62,16 +62,34 @@ export async function GET() {
   const endDate   = end.toISOString().split('T')[0];
 
   try {
-    const [readiness, sleep, activity] = await Promise.all([
+    const [readiness, sleep, activity, sleepSessions] = await Promise.all([
       ouraFetch('daily_readiness', token, startDate, endDate),
       ouraFetch('daily_sleep',     token, startDate, endDate),
       ouraFetch('daily_activity',  token, startDate, endDate),
+      ouraFetch('sleep',           token, startDate, endDate),
     ]);
+
+    // daily_sleep has scores; sleep sessions have durations/HRV/HR — merge by day
+    const sessionsByDay = new Map<string, Record<string, unknown>>();
+    for (const s of (sleepSessions.data ?? [])) {
+      if (s.type === 'long_sleep' || !sessionsByDay.has(s.day)) {
+        sessionsByDay.set(s.day, s);
+      }
+    }
+    const mergedSleep = (sleep.data ?? []).map((d: Record<string, unknown>) => ({
+      ...sessionsByDay.get(d.day as string),
+      ...d,
+    }));
 
     return NextResponse.json({
       readiness: readiness.data ?? [],
-      sleep:     sleep.data     ?? [],
+      sleep:     mergedSleep,
       activity:  activity.data  ?? [],
+      _debug: {
+        sessionCount: sleepSessions.data?.length ?? 0,
+        firstSession: sleepSessions.data?.[0] ?? null,
+        firstDailyDay: sleep.data?.[0]?.day ?? null,
+      },
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
