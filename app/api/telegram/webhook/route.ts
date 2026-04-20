@@ -11,7 +11,7 @@ import { makeRockyTools, ROCKY_PERSONALITY } from '@/lib/rocky-tools';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const OWNER_ID = process.env.TELEGRAM_OWNER_ID!;
-const HISTORY_LIMIT = 20; // messages to keep in context per chat
+const HISTORY_FETCH = 40; // fetch this many most-recent rows, then trim to a clean turn boundary
 const HISTORY_TTL_HOURS = 24; // discard anything older than this
 
 async function sendTelegram(chatId: string | number, text: string) {
@@ -54,9 +54,14 @@ async function loadHistory(chatId: string): Promise<ModelMessage[]> {
     .eq('chat_id', chatId)
     .gte('created_at', cutoff)
     .order('created_at', { ascending: false })
-    .limit(HISTORY_LIMIT);
+    .limit(HISTORY_FETCH);
   if (!data) return [];
-  return data.reverse().map(r => ({ role: r.role, content: r.content } as ModelMessage));
+  const asc = data.reverse();
+  // Trim orphaned assistant/tool messages at the start so history starts at a user-turn boundary.
+  // Without this, the LLM sees a tool-result with no matching tool-call and rejects the request.
+  const firstUser = asc.findIndex(r => r.role === 'user');
+  if (firstUser === -1) return [];
+  return asc.slice(firstUser).map(r => ({ role: r.role, content: r.content } as ModelMessage));
 }
 
 async function saveMessages(chatId: string, messages: ModelMessage[]) {
