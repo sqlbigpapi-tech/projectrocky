@@ -1,4 +1,4 @@
-import { streamText, stepCountIs, type ModelMessage } from 'ai';
+import { streamText, stepCountIs } from 'ai';
 import { NextResponse } from 'next/server';
 import { makeRockyTools, ROCKY_PERSONALITY } from '@/lib/rocky-tools';
 
@@ -12,20 +12,13 @@ export async function POST(request: Request) {
   const eastern = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const todayStr = `${eastern.getFullYear()}-${String(eastern.getMonth() + 1).padStart(2, '0')}-${String(eastern.getDate()).padStart(2, '0')}`;
 
-  const systemMessage: ModelMessage = {
-    role: 'system',
-    content: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in the web command center.`,
-    providerOptions: {
-      anthropic: { cacheControl: { type: 'ephemeral' } },
-    },
-  };
-
   const result = streamText({
     model: 'anthropic/claude-sonnet-4.6',
     maxOutputTokens: 1024,
     tools: makeRockyTools(base),
     stopWhen: stepCountIs(5),
-    messages: [systemMessage, { role: 'user', content: question }],
+    system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in the web command center.`,
+    prompt: question,
   });
 
   const encoder = new TextEncoder();
