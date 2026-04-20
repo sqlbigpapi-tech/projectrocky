@@ -119,7 +119,7 @@ export default function QuickLinks() {
                   onClick={editing ? (e) => { e.preventDefault(); startEdit(l); } : undefined}
                   target={editing ? undefined : '_blank'}
                   rel="noopener noreferrer"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-950 border text-xs font-mono transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--card)] border text-xs font-mono transition-colors ${
                     editing
                       ? 'border-zinc-700 text-zinc-400 cursor-pointer hover:border-amber-500/40 hover:text-white'
                       : 'border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-white'
@@ -143,11 +143,11 @@ export default function QuickLinks() {
           <div className="flex items-center gap-1.5 mt-1">
             <input value={newLabel} onChange={e => setNewLabel(e.target.value)}
               placeholder="Label"
-              className="w-20 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/40" />
+              className="w-20 bg-[var(--card)] border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/40" />
             <input value={newUrl} onChange={e => setNewUrl(e.target.value)}
               placeholder="URL"
               onKeyDown={e => e.key === 'Enter' && addLink()}
-              className="w-36 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/40" />
+              className="w-36 bg-[var(--card)] border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/40" />
             <button onClick={addLink}
               className="px-2 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors">
               Add

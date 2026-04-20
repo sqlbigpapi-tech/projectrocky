@@ -301,7 +301,7 @@ export default function NetWorthTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Net Worth Trajectory */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+        <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
           <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Net Worth Trajectory</p>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={trajectoryData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -313,13 +313,13 @@ export default function NetWorthTab() {
                 labelStyle={{ color: '#a1a1aa' }}
                 formatter={(v: unknown) => [fmt(Number(v)), 'Net Worth']}
               />
-              <Line type="monotone" dataKey="netWorth" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="netWorth" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         {/* Asset Breakdown */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+        <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
           <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Asset Breakdown</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={breakdownData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -340,7 +340,7 @@ export default function NetWorthTab() {
       </div>
 
       {/* ── Account Breakdown ── */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Accounts</p>
           <div className="flex items-center gap-2">
@@ -388,7 +388,7 @@ export default function NetWorthTab() {
                 </div>
                 <div className="space-y-1.5">
                   {accounts.map(a => (
-                    <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900/50 border border-zinc-800">
+                    <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--card)]/50 border border-zinc-800">
                       <div className="flex items-center gap-2">
                         {a.priority && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Pay first" />}
                         <p className="text-sm text-zinc-300">{a.name}</p>
@@ -407,7 +407,7 @@ export default function NetWorthTab() {
 
       {/* ── Update Form ── */}
       {showForm && (
-        <div className="bg-zinc-950 rounded-xl border border-amber-500/20 p-5">
+        <div className="bg-[var(--card)] rounded-xl border border-amber-500/20 p-5">
           <p className="text-xs text-amber-400/70 font-mono uppercase tracking-widest mb-5">Update Balances · {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {categories.map(cat => (
@@ -523,7 +523,7 @@ export default function NetWorthTab() {
 
       {/* ── Snapshot History ── */}
       {snapshots.length > 1 && (
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+        <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
           <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Snapshot History</p>
           <div className="space-y-1.5">
             {[...snapshots].reverse().map((s, i) => {
@@ -531,7 +531,7 @@ export default function NetWorthTab() {
               const prevSnap = [...snapshots].reverse()[i + 1];
               const change = prevSnap ? netWorth - calcTotals(prevSnap.accounts).netWorth : null;
               return (
-                <div key={s.id} className="flex items-center gap-4 px-3 py-2.5 rounded-lg bg-zinc-900/50 border border-zinc-800">
+                <div key={s.id} className="flex items-center gap-4 px-3 py-2.5 rounded-lg bg-[var(--card)]/50 border border-zinc-800">
                   <p className="text-xs text-zinc-500 font-mono w-24 shrink-0">
                     {new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                   </p>
@@ -550,7 +550,7 @@ export default function NetWorthTab() {
       )}
 
       {/* ── AI Recommendations ── */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">AI Recommendations</p>
@@ -586,7 +586,7 @@ export default function NetWorthTab() {
 
         {/* Assumptions editor */}
         {showAssumptions && (
-          <div className="mb-5 p-4 rounded-xl border border-zinc-700 bg-zinc-900/50 space-y-3">
+          <div className="mb-5 p-4 rounded-xl border border-zinc-700 bg-[var(--card)]/50 space-y-3">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Context sent to AI</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -595,7 +595,7 @@ export default function NetWorthTab() {
                   type="number"
                   value={assumptions.age}
                   onChange={e => setAssumptions(p => ({ ...p, age: e.target.value }))}
-                  className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50 transition-colors"
                 />
               </div>
               <div>
@@ -606,7 +606,7 @@ export default function NetWorthTab() {
                     type="number"
                     value={assumptions.salary}
                     onChange={e => setAssumptions(p => ({ ...p, salary: e.target.value }))}
-                    className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-violet-500/50 transition-colors"
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-violet-500/50 transition-colors"
                   />
                 </div>
               </div>
@@ -617,7 +617,7 @@ export default function NetWorthTab() {
                 type="text"
                 value={assumptions.role}
                 onChange={e => setAssumptions(p => ({ ...p, role: e.target.value }))}
-                className="w-full px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-white focus:outline-none focus:border-violet-500/50 transition-colors"
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white focus:outline-none focus:border-violet-500/50 transition-colors"
               />
             </div>
             <div>
@@ -627,7 +627,7 @@ export default function NetWorthTab() {
                 value={assumptions.notes}
                 onChange={e => setAssumptions(p => ({ ...p, notes: e.target.value }))}
                 placeholder="E.g. planning to sell SEI stake in 3 years, spouse also employed, targeting early retirement at 55..."
-                className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-white resize-none placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white resize-none placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
               />
             </div>
             <div className="flex justify-end">

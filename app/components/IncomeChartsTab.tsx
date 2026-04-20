@@ -57,7 +57,7 @@ export default function IncomeChartsTab() {
     return (
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-48 bg-zinc-950 border border-zinc-800 rounded-2xl animate-pulse" />
+          <div key={i} className="h-48 bg-[var(--card)] border border-zinc-800 rounded-2xl animate-pulse" />
         ))}
       </div>
     );
@@ -141,15 +141,15 @@ export default function IncomeChartsTab() {
       </div>
 
       {/* Cumulative Progress Chart */}
-      <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-6">
+      <div className="bg-[var(--card)] rounded-2xl border border-zinc-800 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Cumulative Income vs Plan</p>
             <p className="text-xs text-zinc-700 font-mono mt-0.5">running total through the year</p>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-emerald-400 inline-block rounded" />Actual</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-zinc-600 inline-block rounded border-dashed" />Plan</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-[3px] bg-emerald-400 inline-block rounded" />Actual</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-[3px] bg-zinc-400 inline-block rounded border-dashed" />Plan</span>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={260}>
@@ -160,24 +160,24 @@ export default function IncomeChartsTab() {
                 <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradPlan" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#52525b" stopOpacity={0.1} />
-                <stop offset="95%" stopColor="#52525b" stopOpacity={0} />
+                <stop offset="5%" stopColor="#a1a1aa" stopOpacity={0.08} />
+                <stop offset="95%" stopColor="#a1a1aa" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={GOAL} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: '$1M', fill: '#f59e0b', fontSize: 10, fontFamily: 'monospace', position: 'insideTopRight' }} />
-            <ReferenceLine y={bigGoal} stroke="#a78bfa" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: `${fmt(bigGoal)}`, fill: '#a78bfa', fontSize: 10, fontFamily: 'monospace', position: 'insideTopRight' }} />
-            <Area type="monotone" dataKey="plan" name="Plan" stroke="#52525b" strokeWidth={1.5} fill="url(#gradPlan)" strokeDasharray="4 4" dot={false} />
-            <Area type="monotone" dataKey="actual" name="Actual" stroke="#34d399" strokeWidth={2.5} fill="url(#gradActual)" dot={{ fill: '#34d399', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: '#34d399' }} connectNulls={false} />
+            <ReferenceLine y={GOAL} stroke="#f59e0b" strokeDasharray="6 4" strokeOpacity={0.6} strokeWidth={2} label={{ value: '$1M', fill: '#f59e0b', fontSize: 11, fontFamily: 'monospace', position: 'insideTopRight' }} />
+            <ReferenceLine y={bigGoal} stroke="#a78bfa" strokeDasharray="6 4" strokeOpacity={0.6} strokeWidth={2} label={{ value: `${fmt(bigGoal)}`, fill: '#a78bfa', fontSize: 11, fontFamily: 'monospace', position: 'insideTopRight' }} />
+            <Area type="monotone" dataKey="plan" name="Plan" stroke="#a1a1aa" strokeWidth={2.5} fill="url(#gradPlan)" strokeDasharray="6 4" dot={false} />
+            <Area type="monotone" dataKey="actual" name="Actual" stroke="#34d399" strokeWidth={3} fill="url(#gradActual)" dot={{ fill: '#34d399', r: 5, strokeWidth: 0 }} activeDot={{ r: 7, fill: '#34d399' }} connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {/* Monthly Bar Chart */}
-      <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-6">
+      <div className="bg-[var(--card)] rounded-2xl border border-zinc-800 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Monthly Breakdown</p>
@@ -191,9 +191,9 @@ export default function IncomeChartsTab() {
         </div>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barGap={3}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey="plan" name="Plan" fill="#3f3f46" radius={[3, 3, 0, 0]} maxBarSize={28} />
             <Bar dataKey="actual" name="Actual" radius={[3, 3, 0, 0]} maxBarSize={28}>
@@ -207,7 +207,7 @@ export default function IncomeChartsTab() {
       </div>
 
       {/* Variance Chart */}
-      <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-6">
+      <div className="bg-[var(--card)] rounded-2xl border border-zinc-800 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Monthly Variance vs Plan</p>
@@ -216,9 +216,9 @@ export default function IncomeChartsTab() {
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={varianceData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#52525b', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={v => fmt(v)} tick={{ fill: '#a1a1aa', fontSize: 11, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#52525b" strokeWidth={1} />
             <Bar dataKey="variance" name="Variance" radius={[3, 3, 0, 0]} maxBarSize={32}>
@@ -234,12 +234,12 @@ export default function IncomeChartsTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* $1M Goal */}
-        <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-6">
+        <div className="bg-[var(--card)] rounded-2xl border border-zinc-800 p-6">
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-5">$1M Goal Progress</p>
           <div className="flex items-center gap-8">
             <div className="relative w-28 h-28 shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#27272a" strokeWidth="10" />
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#3f3f46" strokeWidth="10" />
                 <circle cx="50" cy="50" r="40" fill="none" stroke="#34d399" strokeWidth="10"
                   strokeDasharray={`${Math.min(pctGoal, 100) * 2.513} 251.3`}
                   strokeLinecap="round" />
@@ -266,12 +266,12 @@ export default function IncomeChartsTab() {
         </div>
 
         {/* BIG UIP Goal */}
-        <div className="bg-zinc-950 rounded-2xl border border-violet-800/20 p-6">
+        <div className="bg-[var(--card)] rounded-2xl border border-violet-800/20 p-6">
           <p className="text-xs text-violet-400/70 uppercase tracking-widest font-mono mb-5">BIG UIP · {fmt(bigGoal)} Target</p>
           <div className="flex items-center gap-8">
             <div className="relative w-28 h-28 shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#27272a" strokeWidth="10" />
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#3f3f46" strokeWidth="10" />
                 <circle cx="50" cy="50" r="40" fill="none" stroke="#a78bfa" strokeWidth="10"
                   strokeDasharray={`${Math.min(pctBig, 100) * 2.513} 251.3`}
                   strokeLinecap="round" />

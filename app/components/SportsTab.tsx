@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { SportsSkeleton } from './Skeletons';
 
 type FollowedTeam = { sport: string; league: string; teamId: string };
 
@@ -86,12 +87,12 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
   }, [followed.teamId]);
 
   if (loading) {
-    return <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />;
+    return <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />;
   }
 
   if (!feed) {
     return (
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 text-zinc-600 text-sm">
+      <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 text-zinc-600 text-sm">
         Failed to load team data.
       </div>
     );
@@ -103,7 +104,7 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+    <div className="bg-[var(--card)] border border-zinc-800 rounded-xl overflow-hidden">
       {/* Team header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
         <div className="flex items-center gap-3">
@@ -249,7 +250,7 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
               <div className="space-y-2">
                 {news.map(item => (
                   <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer"
-                    className="flex gap-3 group hover:bg-zinc-900/40 rounded-lg p-1.5 transition -mx-1.5">
+                    className="flex gap-3 group hover:bg-[var(--card)]/40 rounded-lg p-1.5 transition -mx-1.5">
                     {item.image && (
                       <div className="w-16 h-10 relative rounded overflow-hidden shrink-0 bg-zinc-900">
                         <Image src={item.image} alt="" fill className="object-cover" unoptimized />
@@ -306,7 +307,7 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-[var(--card)] border border-zinc-800 rounded-xl w-full max-w-md max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <p className="text-sm font-bold text-white">Follow a Team</p>
           <button onClick={onClose} className="text-zinc-600 hover:text-white transition">✕</button>
@@ -354,7 +355,7 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
                       onClose();
                     }}
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${
-                      already ? 'opacity-40 cursor-default' : 'hover:bg-zinc-900/50'
+                      already ? 'opacity-40 cursor-default' : 'hover:bg-[var(--card)]/50'
                     }`}
                   >
                     {team.logo && (
@@ -403,13 +404,7 @@ export default function SportsTab() {
     save(followed.filter(f => !(f.teamId === teamId && f.league === league)));
   }
 
-  if (!mounted) return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />
-      ))}
-    </div>
-  );
+  if (!mounted) return <SportsSkeleton />;
 
   return (
     <div>
@@ -424,7 +419,7 @@ export default function SportsTab() {
       </div>
 
       {followed.length === 0 ? (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
+        <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
           No teams followed yet. Hit "+ Follow Team" to get started.
         </div>
       ) : (

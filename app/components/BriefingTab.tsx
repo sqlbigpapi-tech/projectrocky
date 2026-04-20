@@ -1,9 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { BriefingSkeleton } from './Skeletons';
 
 type FollowedTeam = { sport: string; league: string; teamId: string };
 type GameInfo = { id: string; date: string; opponent: string; opponentAbbr: string; homeAway: string; teamScore: string; opponentScore: string; result: 'W' | 'L' | null; statusDetail: string };
-type TeamFeed = { team: { id: string; name: string; abbr: string; league: string; record: string | null }; liveGame: GameInfo | null; lastGame: GameInfo | null; nextGame: GameInfo | null };
+type Standings = { record: string; streak: string; divisionGB: string; playoffSeed: number } | null;
+type TeamFeed = { team: { id: string; name: string; abbr: string; league: string; record: string | null }; liveGame: GameInfo | null; lastGame: GameInfo | null; nextGame: GameInfo | null; standings: Standings };
 
 const DEFAULT_TEAMS: FollowedTeam[] = [
   { sport: 'baseball',   league: 'mlb', teamId: '21' },
@@ -16,61 +18,10 @@ const LEAGUE_COLORS: Record<string, string> = {
   NFL: 'text-red-400', NBA: 'text-orange-400', MLB: 'text-blue-400', NCAAF: 'text-green-400',
 };
 
-function BriefingTeamRow({ followed, onFeed }: { followed: FollowedTeam; onFeed?: (feed: TeamFeed) => void }) {
-  const [feed, setFeed] = useState<TeamFeed | null>(null);
-
-  useEffect(() => {
-    const load = () => {
-      fetch(`/api/team-feed?sport=${followed.sport}&league=${followed.league}&teamId=${followed.teamId}`)
-        .then(r => r.json())
-        .then(d => { if (!d.error) { setFeed(d); onFeed?.(d); } })
-        .catch(() => {});
-    };
-    load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
-  }, [followed.teamId]);
-
-  if (!feed) return <div className="h-10 bg-zinc-900 rounded-lg animate-pulse" />;
-
-  const { team, liveGame, lastGame, nextGame } = feed;
-  const game = liveGame ?? lastGame ?? nextGame;
-  const isLive = !!liveGame;
-  const isNext = !liveGame && !lastGame && !!nextGame;
-  const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400';
-
-  const espnUrl = game?.id ? `https://www.espn.com/${followed.league}/game/_/gameId/${game.id}` : null;
-  const Wrapper = espnUrl ? 'a' : 'div';
-  const wrapperProps = espnUrl ? { href: espnUrl, target: '_blank', rel: 'noopener noreferrer' } : {};
-
-  return (
-    <Wrapper {...wrapperProps as any} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${isLive ? 'bg-green-500/5 border-green-500/20' : 'bg-zinc-900/50 border-zinc-800'} ${espnUrl ? 'hover:border-zinc-600 cursor-pointer' : ''}`}>
-      <span className={`text-xs font-bold font-mono w-8 shrink-0 ${leagueColor}`}>{team.league}</span>
-      <p className="text-sm font-medium text-white shrink-0">{team.abbr}</p>
-      {game ? (
-        <>
-          <p className="text-xs text-zinc-500 font-mono flex-1 truncate">
-            {isNext ? `vs ${game.opponentAbbr} · ${new Date(game.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : `${game.homeAway === 'home' ? 'vs' : '@'} ${game.opponentAbbr}`}
-          </p>
-          {!isNext && (
-            <span className={`text-xs font-bold font-mono tabular-nums ${isLive ? 'text-green-400' : game.result === 'W' ? 'text-emerald-400' : game.result === 'L' ? 'text-red-400' : 'text-zinc-400'}`}>
-              {game.result ? `${game.result} ` : ''}{game.teamScore || '0'}–{game.opponentScore || '0'}
-            </span>
-          )}
-          {isNext && <span className="text-xs text-zinc-600 font-mono">{new Date(game.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>}
-          {isLive && <span className="flex items-center gap-1 text-xs text-green-400"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />LIVE</span>}
-        </>
-      ) : (
-        <p className="text-xs text-zinc-600 font-mono flex-1">No games scheduled</p>
-      )}
-    </Wrapper>
-  );
-}
 type WeatherCurrent = { temp: number; feelsLike: number; condition: string; code: number; windSpeed: number; windDir: string; humidity: number };
-type Task = { id: string; title: string; priority: string; due_date: string | null; category: string; completed: boolean; recurrence: string | null };
+type Task = { id: string; title: string; priority: string; due_date: string | null; category: string; completed: boolean; recurrence: string | null; is_bill?: boolean; bill_amount?: number | null };
 type NewsItem = { title: string; link: string; source: string; pubDate: string; category: string };
 type IncomeMonth = { month: number; plan: number; actual: number | null; is_forecast: boolean };
-type OuraDay = { day: string; score: number; steps?: number; active_calories?: number; total_sleep_duration?: number };
 
 
 function weatherIcon(code: number): string {
@@ -114,19 +65,17 @@ const CATEGORY_COLORS: Record<string, string> = {
 type NavTab = 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'networth' | 'finmodel' | 'headcount' | 'equity';
 type EquitySummary = { sharePrice: number; valuation: number; trailing12: number; month: number; isForecast: boolean };
 type EndingSoonItem = { consultantName: string; client: string; sowEnd: string; annualTotal: number };
+type CalEvent = { summary: string; start: string; end: string; location: string; isAllDay: boolean };
 
 export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab) => void }) {
   const [weather, setWeather] = useState<WeatherCurrent | null>(null);
+  const [calEvents, setCalEvents] = useState<CalEvent[]>([]);
   const [followedTeams, setFollowedTeams] = useState<FollowedTeam[]>(DEFAULT_TEAMS);
   const [teamFeeds, setTeamFeeds] = useState<TeamFeed[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [incomeMonths, setIncomeMonths] = useState<IncomeMonth[]>([]);
-  const [bigIncomeGoal, setBigIncomeGoal] = useState(1700000);
   const [netWorthSnaps, setNetWorthSnaps] = useState<{ id: string; date: string; accounts: { category: string; balance: number }[] }[]>([]);
-  const [ouraActivity, setOuraActivity]   = useState<OuraDay[]>([]);
-  const [ouraReadiness, setOuraReadiness] = useState<OuraDay[]>([]);
-  const [ouraSleep, setOuraSleep]         = useState<OuraDay[]>([]);
   const [equitySummary, setEquitySummary] = useState<EquitySummary | null>(null);
   const [endingSoon, setEndingSoon] = useState<EndingSoonItem[]>([]);
   const [forecastRevenue, setForecastRevenue] = useState<{ month: number; revenue: number }[]>([]);
@@ -143,6 +92,12 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
     } else if (task.recurrence === 'monthly') {
       const base = task.due_date ? new Date(task.due_date + 'T00:00:00') : new Date();
       base.setMonth(base.getMonth() + 1);
+      const due_date = base.toISOString().split('T')[0];
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, due_date } : t));
+      await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, completed: false, due_date }) });
+    } else if (task.recurrence === 'yearly') {
+      const base = task.due_date ? new Date(task.due_date + 'T00:00:00') : new Date();
+      base.setFullYear(base.getFullYear() + 1);
       const due_date = base.toISOString().split('T')[0];
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, due_date } : t));
       await fetch('/api/tasks', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, completed: false, due_date }) });
@@ -164,56 +119,48 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
       if (stored) setFollowedTeams(JSON.parse(stored));
     } catch {}
 
-    // Fire all API calls in parallel
+    // Fire all API calls independently — each updates state as it resolves
     const safe = (p: Promise<Response>) => p.then(r => r.json()).catch(() => null);
-    Promise.all([
-      safe(fetch('/api/weather')),
-      safe(fetch('/api/tasks')),
-      safe(fetch('/api/news')),
-      safe(fetch('/api/net-worth')),
-      safe(fetch('/api/oura')),
-      safe(fetch('/api/income')),
-      safe(fetch('/api/settings?key=big_uip_goal')),
-      safe(fetch('/api/equity?year=2026')),
-      safe(fetch('/api/billing?year=2026')),
-      safe(fetch('/api/pl?year=2026')),
-    ]).then(([weather, tasks, news, nw, oura, income, bigGoalSetting, equity, billing, pl]) => {
-      if (weather?.current) setWeather(weather.current);
-      if (tasks?.tasks) setTasks(tasks.tasks);
-      if (news?.articles) setNews(news.articles);
-      if (nw?.snapshots) setNetWorthSnaps(nw.snapshots);
-      if (oura && !oura.error) {
-        setOuraActivity(oura.activity ?? []);
-        setOuraReadiness(oura.readiness ?? []);
-        setOuraSleep(oura.sleep ?? []);
-      }
-      if (income?.months) setIncomeMonths(income.months);
-      if (bigGoalSetting?.value) setBigIncomeGoal(Number(bigGoalSetting.value));
-      if (equity?.latest) setEquitySummary(equity.latest);
-      if (billing?.forecast) {
-        const forecast = billing.forecast;
+
+    // These three feed the Rocky greeting — collect their results
+    const weatherP = safe(fetch('/api/weather')).then(d => { if (d?.current) setWeather(d.current); return d; });
+    const tasksP = safe(fetch('/api/tasks')).then(d => { if (d?.tasks) setTasks(d.tasks); return d; });
+    const calP = safe(fetch('/api/calendar')).then(d => { if (d?.events) setCalEvents(d.events); return d; });
+
+    safe(fetch('/api/news')).then(d => { if (d?.articles) setNews(d.articles); });
+    safe(fetch('/api/net-worth')).then(d => { if (d?.snapshots) setNetWorthSnaps(d.snapshots); });
+
+    // Fetch team feeds for smart greeting context
+    for (const t of followedTeams) {
+      safe(fetch(`/api/team-feed?sport=${t.sport}&league=${t.league}&teamId=${t.teamId}`))
+        .then(d => { if (d && !d.error) setTeamFeeds(prev => [...prev.filter(f => f.team.id !== d.team.id), d]); });
+    }
+    safe(fetch('/api/income')).then(d => { if (d?.months) setIncomeMonths(d.months); });
+    safe(fetch('/api/equity?year=2026')).then(d => { if (d?.latest) setEquitySummary(d.latest); });
+    safe(fetch('/api/billing?year=2026')).then(d => {
+      if (d?.forecast) {
         const today = new Date();
         const sixtyOut = new Date(today); sixtyOut.setDate(sixtyOut.getDate() + 60);
-        setEndingSoon(forecast.filter((f: any) => {
+        setEndingSoon(d.forecast.filter((f: any) => {
           const end = new Date(f.sowEnd);
           return end >= today && end <= sixtyOut;
         }).map((f: any) => ({ consultantName: f.consultantName, client: f.client, sowEnd: f.sowEnd, annualTotal: f.annualTotal })));
       }
-      if (pl?.months) {
+    });
+    safe(fetch('/api/pl?year=2026')).then(d => {
+      if (d?.months) {
         const currentMonth = new Date().getMonth() + 1;
-        const upcoming = pl.months.filter((m: any) => m.month >= currentMonth && m.month <= currentMonth + 2);
+        const upcoming = d.months.filter((m: any) => m.month >= currentMonth && m.month <= currentMonth + 2);
         setForecastRevenue(upcoming.map((m: any) => ({ month: m.month, revenue: m.revenue })));
       }
     });
+    // Rocky greeting removed — no data sent to AI on page load
   }, []);
 
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
 
-  function handleTeamFeed(feed: TeamFeed) {
-    setTeamFeeds(prev => [...prev.filter(f => f.team.id !== feed.team.id), feed]);
-  }
 
 
   const today = new Date();
@@ -243,7 +190,6 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
   const lockedMonths = incomeMonths.filter(m => m.actual !== null && !m.is_forecast);
   const ytd = lockedMonths.reduce((s, m) => s + (m.actual ?? 0), 0);
   const pct = Math.min((ytd / INCOME_GOAL) * 100, 100);
-  const bigPct = Math.min((ytd / bigIncomeGoal) * 100, 100);
   const runRate = lockedMonths.length > 0 ? ytd / lockedMonths.length : 0;
   const currentMonth = new Date().getMonth() + 1;
   const monthsLeft = 12 - currentMonth;
@@ -261,11 +207,19 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
   const nwValue  = nwTotal(nwCurrent);
   const nwChange = nwPrev != null ? nwValue - nwTotal(nwPrev) : null;
 
-  // Smart greeting context — priority: overdue > live game > tonight > last result > pace
+  // Smart greeting context — priority: overdue > calendar > live game > tonight > last result > pace
   const overdueTasks = upcomingTasks.filter(t => t.due_date && new Date(t.due_date + 'T00:00:00') < today);
+  const nonAllDayEvents = calEvents.filter(e => !e.isAllDay);
+  const nextMeeting = nonAllDayEvents.find(e => new Date(e.start) > now);
+
   let smartContext: string | null = null;
   if (overdueTasks.length > 0) {
     smartContext = `You have ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? 's' : ''}.`;
+  } else if (nonAllDayEvents.length > 0 && nextMeeting) {
+    const t = new Date(nextMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+    smartContext = `${nonAllDayEvents.length} meeting${nonAllDayEvents.length > 1 ? 's' : ''} today. Next: ${nextMeeting.summary} at ${t}.`;
+  } else if (nonAllDayEvents.length > 0) {
+    smartContext = `${nonAllDayEvents.length} meeting${nonAllDayEvents.length > 1 ? 's' : ''} today.`;
   } else {
     const liveF = teamFeeds.find(f => f.liveGame);
     if (liveF) {
@@ -295,312 +249,379 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
 
 
   // Oura today
-  const todayOuraA = ouraActivity.length  > 0 ? ouraActivity[ouraActivity.length   - 1] : null;
-  const todayOuraR = ouraReadiness.length > 0 ? ouraReadiness[ouraReadiness.length - 1] : null;
-  const todayOuraS = ouraSleep.length     > 0 ? ouraSleep[ouraSleep.length         - 1] : null;
 
-  if (!mounted) return null;
+  if (!mounted) return <BriefingSkeleton />;
+
+  // Helpers for compact KPI formatting
+  function kpiFmt(n: number) {
+    if (Math.abs(n) >= 1000000) return `$${(n / 1000000).toFixed(2)}M`;
+    if (Math.abs(n) >= 1000) return `$${Math.round(n / 1000).toLocaleString()}K`;
+    return `$${Math.round(n).toLocaleString()}`;
+  }
+
+  function ouraScoreColor(s: number) {
+    if (s >= 85) return 'text-emerald-400';
+    if (s >= 70) return 'text-amber-400';
+    return 'text-red-400';
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
 
-      {/* ── Hero: Date + Weather ── */}
-      <div className="rounded-2xl border border-amber-600/20 overflow-hidden bg-gradient-to-br from-amber-950/30 via-zinc-950 to-zinc-950">
-        <div className="p-6 md:p-8">
-          <p className="text-xs text-amber-400/70 uppercase tracking-[0.3em] font-mono mb-4">Project Rocky · Daily Briefing</p>
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            {/* Date + greeting */}
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight leading-tight">{dateStr}</h2>
-              <p className="text-zinc-400 mt-1">
-                {greeting}, David.{smartContext ? <span className="text-zinc-300"> {smartContext}</span> : null}
-              </p>
-            </div>
-            {/* Time + weather inline */}
-            <div className="flex items-center gap-6 shrink-0">
-              {weather && (
-                <div className="flex items-center gap-3 border-r border-zinc-800 pr-6">
-                  <span className="text-3xl">{weatherIcon(weather.code)}</span>
-                  <div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{weather.temp}°F</p>
-                    <p className="text-xs text-zinc-500">Feels {weather.feelsLike}° · {weather.windSpeed}mph</p>
-                  </div>
-                </div>
-              )}
-              <p className="text-5xl font-mono font-bold text-amber-400 tabular-nums tracking-tight">{timeStr}</p>
-            </div>
-          </div>
+      {/* ── Tier 1: Compact Hero ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]/60">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+            {greeting}, {typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )user_name=([^;]*)/)?.[1] ?? 'David') : 'David'}.
+          </h2>
+          {smartContext && <p className="text-sm text-zinc-400 mt-0.5">{smartContext}</p>}
         </div>
-
-        {/* Status bar */}
-        <div className="border-t border-zinc-800/60 px-6 md:px-8 py-3 flex items-center gap-6 bg-zinc-900/30">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="text-xs text-zinc-500 font-mono">Parkland, FL</span>
-          </div>
+        <div className="flex items-center gap-4 shrink-0">
           {weather && (
-            <span className="text-xs text-zinc-600 font-mono">{weather.condition} · {weather.humidity}% humidity</span>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{weatherIcon(weather.code)}</span>
+              <span className="text-sm font-bold text-white tabular-nums">{weather.temp}°F</span>
+              <span className="text-xs text-zinc-600 font-mono">{weather.condition}</span>
+            </div>
           )}
+          <span className="text-xs text-zinc-700 font-mono hidden md:block">{dateStr}</span>
         </div>
       </div>
 
-      {/* ── Income Summary ── */}
-      {incomeMonths.length > 0 && (
-        <div className="rounded-2xl border border-emerald-600/20 overflow-hidden bg-gradient-to-br from-emerald-950/20 via-zinc-950 to-zinc-950">
-          <div className="p-5 md:p-6">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-xs text-emerald-400/70 uppercase tracking-[0.3em] font-mono">SEI Miami · 2026 Net Income</p>
-              <div className="flex items-center gap-3">
-                <button onClick={() => onNavigate?.('income')} className="text-xs text-zinc-600 font-mono hover:text-emerald-400 transition-colors">income →</button>
+      {/* ── News Ticker ── */}
+      {news.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-[var(--border)]/40 bg-[var(--card)]/30">
+          <div className="flex items-center">
+            <span className="text-[9px] font-bold font-mono text-amber-400 bg-zinc-900 px-2.5 py-1.5 shrink-0 border-r border-[var(--border)]/40">NEWS</span>
+            <div className="overflow-hidden flex-1">
+              <div className="ticker-track flex items-center gap-6 px-4 py-1.5 whitespace-nowrap" style={{ width: 'max-content' }}>
+                {[...news.slice(0, 12), ...news.slice(0, 12)].map((item, i) => {
+                  const color = CATEGORY_COLORS[item.category] ?? 'text-zinc-500';
+                  return (
+                    <a key={i} href={item.link} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                      <span className={`text-[9px] font-bold font-mono ${color}`}>{item.category.slice(0, 5).toUpperCase()}</span>
+                      <span className="text-[11px] text-zinc-400 hover:text-white">{item.title}</span>
+                      <span className="text-[9px] text-zinc-700 font-mono">{timeAgo(item.pubDate)}</span>
+                    </a>
+                  );
+                })}
               </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">YTD Locked</p>
-                <p className="text-2xl font-bold text-emerald-400 tabular-nums">${ytd.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">{lockedMonths.length} months actual</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Run Rate</p>
-                <p className="text-2xl font-bold text-white tabular-nums">${Math.round(runRate).toLocaleString()}<span className="text-sm text-zinc-500">/mo</span></p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">on current pace</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">vs $1M Goal</p>
-                <p className="text-2xl font-bold tabular-nums" style={{ color: pct >= 100 ? '#34d399' : '#f59e0b' }}>{pct.toFixed(1)}%</p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">${Math.round(projectedTotal).toLocaleString()} projected</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">vs ${(bigIncomeGoal / 1000000).toFixed(1)}M UIP</p>
-                <p className="text-2xl font-bold text-violet-400 tabular-nums">{bigPct.toFixed(1)}%</p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">${Math.round(bigIncomeGoal - ytd).toLocaleString()} remaining</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-xs text-zinc-600 font-mono w-10">$1M</span>
-              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-              </div>
-              <span className="text-xs text-emerald-400 font-mono w-10 text-right">{pct.toFixed(0)}%</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-zinc-600 font-mono w-10">${(bigIncomeGoal / 1000000).toFixed(1)}M</span>
-              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${bigPct}%`, background: 'linear-gradient(90deg,#7c3aed,#a78bfa)' }} />
-              </div>
-              <span className="text-xs text-violet-400 font-mono w-10 text-right">{bigPct.toFixed(0)}%</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Net Worth Snapshot ── */}
-      {nwCurrent && (
-        <div className="rounded-2xl border border-violet-600/20 bg-gradient-to-br from-violet-950/20 via-zinc-950 to-zinc-950 px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-violet-400/70 uppercase tracking-[0.3em] font-mono">Net Worth · Latest Snapshot</p>
-            <button onClick={() => onNavigate?.('networth')} className="text-xs text-zinc-600 font-mono hover:text-violet-400 transition-colors">net worth →</button>
-          </div>
-          <div className="flex items-center gap-8">
-            <div>
-              <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Net Worth</p>
-              <p className="text-2xl font-bold text-violet-400 tabular-nums">${nwValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
-            </div>
-            {nwChange !== null && (
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Since Last Snapshot</p>
-                <p className={`text-2xl font-bold tabular-nums ${nwChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {nwChange >= 0 ? '+' : ''}${Math.abs(nwChange).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Last Updated</p>
-              <p className="text-sm text-zinc-300 font-mono">{new Date(nwCurrent.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Three-Column Grid ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
+        {/* Col 1: Calendar + Tasks */}
+        <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
 
-      {/* ── Financial Model Summary ── */}
-      {equitySummary && (
-        <div className="rounded-2xl border border-amber-600/20 overflow-hidden bg-gradient-to-br from-amber-950/20 via-zinc-950 to-zinc-950">
-          <div className="p-5 md:p-6">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-xs text-amber-400/70 uppercase tracking-[0.3em] font-mono">Financial Model · MIA</p>
-              <div className="flex items-center gap-3">
-                <button onClick={() => onNavigate?.('equity')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">equity →</button>
-                <button onClick={() => onNavigate?.('finmodel')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">model →</button>
+          {/* Calendar */}
+          {calEvents.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Today's Schedule</p>
+                <p className="text-[10px] text-zinc-600 font-mono">{nonAllDayEvents.length} meeting{nonAllDayEvents.length !== 1 ? 's' : ''}</p>
               </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Share Price</p>
-                <p className="text-2xl font-bold text-amber-400 tabular-nums">${equitySummary.sharePrice.toFixed(2)}</p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">as of {MONTHS[equitySummary.month - 1]} {equitySummary.isForecast ? '(fcst)' : ''}</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Valuation</p>
-                <p className="text-2xl font-bold text-white tabular-nums">
-                  {equitySummary.valuation >= 1000000 ? `$${(equitySummary.valuation / 1000000).toFixed(1)}M` : `$${Math.round(equitySummary.valuation / 1000)}K`}
-                </p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">5x T12 + retained</p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Trailing 12 NI</p>
-                <p className={`text-2xl font-bold tabular-nums ${equitySummary.trailing12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {equitySummary.trailing12 >= 1000000 ? `$${(equitySummary.trailing12 / 1000000).toFixed(1)}M` : `$${Math.round(equitySummary.trailing12 / 1000)}K`}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Next 3 Mo Revenue</p>
-                <p className="text-2xl font-bold text-zinc-300 tabular-nums">
-                  {forecastRevenue.length > 0 ? `$${Math.round(forecastRevenue.reduce((s, m) => s + m.revenue, 0) / 1000)}K` : '—'}
-                </p>
-                <p className="text-xs text-zinc-600 font-mono mt-0.5">
-                  {forecastRevenue.map(m => MONTHS[m.month - 1]).join(', ')}
-                </p>
-              </div>
-            </div>
-
-            {/* Engagements ending soon */}
-            {endingSoon.length > 0 && (
-              <div className="border-t border-zinc-800/60 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs text-red-400/70 uppercase tracking-[0.2em] font-mono font-bold">Engagements Ending Within 60 Days</p>
-                  <button onClick={() => onNavigate?.('headcount')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">headcount →</button>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {endingSoon.map((e, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/5 border border-red-500/20">
-                      <span className="text-xs text-white font-bold font-mono">{e.consultantName}</span>
-                      <span className="text-xs text-zinc-500 font-mono">@ {e.client}</span>
-                      <span className="text-xs text-red-400 font-mono">
-                        ends {new Date(e.sowEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              <div className="space-y-0.5 mb-4">
+                {calEvents.map((e, i) => {
+                  const startTime = e.isAllDay ? null : new Date(e.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+                  const isPast = !e.isAllDay && new Date(e.end) < now;
+                  const isCurrent = !e.isAllDay && new Date(e.start) <= now && new Date(e.end) > now;
+                  return (
+                    <div key={i} className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-all ${
+                      isCurrent ? 'bg-amber-500/10 border border-amber-500/20' :
+                      isPast ? 'opacity-40' :
+                      'hover:bg-zinc-800/50'
+                    }`}>
+                      {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
+                      {!isCurrent && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isPast ? 'bg-zinc-700' : 'bg-zinc-600'}`} />}
+                      <span className="text-[10px] text-zinc-500 font-mono tabular-nums w-16 shrink-0">
+                        {e.isAllDay ? 'All day' : startTime}
                       </span>
+                      <p className={`text-[11px] flex-1 truncate ${isCurrent ? 'text-amber-400 font-medium' : 'text-zinc-300'}`}>{e.summary}</p>
+                      {e.location && !e.isAllDay && (
+                        <span className="text-[9px] text-zinc-700 font-mono shrink-0 truncate max-w-[60px]">{e.location.includes('Teams') ? 'Teams' : e.location.slice(0, 10)}</span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            )}
+              <div className="border-t border-[var(--border)]/60 pt-3 mb-1" />
+            </>
+          )}
+
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Tasks</p>
+            <button onClick={() => onNavigate?.('tasks')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">{openTasks.length} open →</button>
           </div>
-        </div>
-      )}
-
-      {/* ── Row: Tasks + Sports ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        {/* Tasks */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Due This Week</p>
-            <button onClick={() => onNavigate?.('tasks')} className="text-xs text-zinc-600 font-mono hover:text-amber-400 transition-colors">{openTasks.length} open total →</button>
-          </div>
-
           {upcomingTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 gap-2">
-              <p className="text-2xl">✓</p>
-              <p className="text-sm text-zinc-500">Nothing due this week.</p>
+            <div className="flex flex-col items-center justify-center py-6 gap-1.5">
+              <span className="text-lg text-zinc-700">✓</span>
+              <p className="text-[10px] text-zinc-600 font-mono">All clear</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {upcomingTasks.map(task => {
+            <div className="space-y-1">
+              {upcomingTasks.slice(0, 7).map(task => {
                 const label = task.due_date ? taskDueLabel(task.due_date) : { text: 'Today', color: 'text-cyan-400' };
                 const isOverdue = label.text === 'Overdue';
                 const isToday = label.text === 'Today';
                 return (
-                  <div key={task.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all ${
-                    isOverdue ? 'bg-red-500/5 border-red-500/20' :
-                    isToday ? 'bg-yellow-500/5 border-yellow-500/20' :
-                    'bg-zinc-900/50 border-zinc-800'
+                  <div key={task.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
+                    isOverdue ? 'bg-red-500/5' : isToday ? 'bg-amber-500/5' : 'hover:bg-zinc-800/50'
                   }`}>
-                    <button onClick={() => completeTask(task)} className="w-4 h-4 rounded border border-zinc-600 hover:border-emerald-400 hover:bg-emerald-500/10 shrink-0 flex items-center justify-center transition-colors" title="Complete task" />
-                    <p onClick={() => onNavigate?.('tasks')} className="text-sm text-zinc-200 flex-1 truncate cursor-pointer hover:text-white transition-colors">{task.title}</p>
-                    <span className={`text-xs font-mono shrink-0 ${label.color}`}>{label.text}</span>
+                    <button onClick={() => completeTask(task)} className="w-3.5 h-3.5 rounded border border-zinc-700 hover:border-emerald-400 shrink-0 transition-colors" />
+                    <p onClick={() => onNavigate?.('tasks')} className="text-[11px] text-zinc-300 flex-1 truncate cursor-pointer hover:text-white transition-colors">{task.title}</p>
+                    <span className={`text-[9px] font-mono shrink-0 ${label.color}`}>{label.text}</span>
                   </div>
                 );
               })}
+              {upcomingTasks.length > 7 && (
+                <button onClick={() => onNavigate?.('tasks')} className="text-[10px] text-zinc-600 font-mono hover:text-zinc-400 transition-colors pl-2 pt-1">
+                  +{upcomingTasks.length - 7} more
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Sports */}
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Your Teams</p>
-            <button onClick={() => onNavigate?.('sports')} className="text-xs text-zinc-600 font-mono hover:text-white transition-colors">manage →</button>
+        {/* Col 2: Business */}
+        <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Business</p>
+            <div className="flex gap-2">
+              <button onClick={() => onNavigate?.('equity')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">equity →</button>
+              <button onClick={() => onNavigate?.('finmodel')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">model →</button>
+            </div>
           </div>
-          <div className="space-y-2">
-            {followedTeams.map(t => (
-              <BriefingTeamRow key={`${t.league}-${t.teamId}`} followed={t} onFeed={handleTeamFeed} />
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* ── Oura Health ── */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Recovery · Today</p>
-          <button onClick={() => onNavigate?.('health')} className="text-xs text-zinc-600 font-mono hover:text-cyan-400 transition-colors">health →</button>
-        </div>
-        {!todayOuraR && !todayOuraA && !todayOuraS ? (
-          <p className="text-xs text-zinc-600 font-mono py-4 text-center">Connect Oura to see recovery data</p>
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            {todayOuraR && (
-              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Readiness</p>
-                <p className={`text-3xl font-bold tabular-nums ${todayOuraR.score >= 85 ? 'text-emerald-400' : todayOuraR.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraR.score}</p>
-                <p className="text-xs text-zinc-600 font-mono">{todayOuraR.score >= 85 ? 'Optimal' : todayOuraR.score >= 70 ? 'Good' : 'Fair'}</p>
+          {equitySummary && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4">
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Valuation</p>
+                <p className="text-sm font-bold text-white tabular-nums">{kpiFmt(equitySummary.valuation)}</p>
               </div>
-            )}
-            {todayOuraS && (
-              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Sleep</p>
-                <p className={`text-3xl font-bold tabular-nums ${todayOuraS.score >= 85 ? 'text-cyan-400' : todayOuraS.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraS.score}</p>
-                <p className="text-xs text-zinc-600 font-mono">
-                  {todayOuraS.total_sleep_duration ? `${Math.floor(todayOuraS.total_sleep_duration / 3600)}h ${Math.floor((todayOuraS.total_sleep_duration % 3600) / 60)}m` : '—'}
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">T12 Net Income</p>
+                <p className={`text-sm font-bold tabular-nums ${equitySummary.trailing12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{kpiFmt(equitySummary.trailing12)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Next 3 Mo Rev</p>
+                <p className="text-sm font-bold text-zinc-300 tabular-nums">
+                  {forecastRevenue.length > 0 ? kpiFmt(forecastRevenue.reduce((s, m) => s + m.revenue, 0)) : '—'}
                 </p>
               </div>
-            )}
-            {todayOuraA && (
-              <div className="flex flex-col items-center justify-center rounded-lg bg-zinc-900/50 border border-zinc-800 p-3 gap-1">
-                <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">Activity</p>
-                <p className={`text-3xl font-bold tabular-nums ${todayOuraA.score >= 85 ? 'text-orange-400' : todayOuraA.score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{todayOuraA.score}</p>
-                <p className="text-xs text-zinc-600 font-mono">{todayOuraA.steps ? `${(todayOuraA.steps / 1000).toFixed(1)}k steps` : '—'}</p>
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Run Rate</p>
+                <p className="text-sm font-bold text-zinc-300 tabular-nums">{kpiFmt(runRate)}/mo</p>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Engagements ending soon */}
+          {endingSoon.length > 0 && (
+            <div className="pt-3 border-t border-[var(--border)]/60">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-red-400/70 uppercase tracking-widest font-mono font-bold">Ending Soon</p>
+                <button onClick={() => onNavigate?.('headcount')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">→</button>
+              </div>
+              <div className="space-y-1">
+                {endingSoon.map((e, i) => (
+                  <div key={i} className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-red-500/5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[11px] text-white font-bold font-mono truncate">{e.consultantName}</span>
+                      <span className="text-[9px] text-zinc-600 font-mono truncate">@ {e.client}</span>
+                    </div>
+                    <span className="text-[9px] text-red-400 font-mono shrink-0 ml-2">
+                      {new Date(e.sowEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Col 3: Finance Snapshot */}
+        <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Finance</p>
+            <button onClick={() => onNavigate?.('networth')} className="text-[10px] text-zinc-600 font-mono hover:text-violet-400 transition-colors">net worth →</button>
           </div>
-        )}
+
+          {/* Net Worth */}
+          <div className="mb-4">
+            <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Net Worth</p>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xl font-bold text-violet-400 tabular-nums">{kpiFmt(nwValue)}</p>
+                {nwChange !== null && (
+                  <p className={`text-[10px] font-mono tabular-nums ${nwChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {nwChange >= 0 ? '+' : ''}{kpiFmt(nwChange)} since last snapshot
+                  </p>
+                )}
+              </div>
+              {(() => {
+                const history = netWorthSnaps.slice(-12).map(nwTotal).filter(v => v > 0);
+                if (history.length < 2) return null;
+                const min = Math.min(...history);
+                const max = Math.max(...history);
+                const range = max - min || 1;
+                const W = 80, H = 28;
+                const points = history.map((v, i) => {
+                  const x = (i / (history.length - 1)) * W;
+                  const y = H - ((v - min) / range) * H;
+                  return `${x.toFixed(1)},${y.toFixed(1)}`;
+                }).join(' ');
+                const up = history[history.length - 1] >= history[0];
+                const stroke = up ? '#34d399' : '#f87171';
+                const fill = up ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
+                return (
+                  <svg width={W} height={H} className="shrink-0" viewBox={`0 0 ${W} ${H}`}>
+                    <polygon points={`0,${H} ${points} ${W},${H}`} fill={fill} />
+                    <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Income YTD */}
+          {incomeMonths.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] text-zinc-600 font-mono mb-0.5">YTD Income</p>
+              <p className="text-sm font-bold text-emerald-400 tabular-nums">{kpiFmt(ytd)}</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[9px] text-emerald-400 font-mono">{pct.toFixed(0)}%</span>
+              </div>
+              <p className="text-[9px] text-zinc-700 font-mono mt-0.5">of $1M goal · {kpiFmt(projectedTotal)} projected</p>
+            </div>
+          )}
+
+          {/* Bills */}
+          {(() => {
+            const openBills = openTasks.filter(t => t.is_bill);
+            if (openBills.length === 0) return null;
+            const monthEndISO = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+            const thisMonthBills = openBills.filter(b => b.due_date && b.due_date <= monthEndISO);
+            const thisMonthTotal = thisMonthBills.reduce((s, b) => s + (b.bill_amount ?? 0), 0);
+            const nextBills = openBills
+              .filter(b => b.due_date)
+              .sort((a, b) => (a.due_date! > b.due_date! ? 1 : -1))
+              .slice(0, 3);
+            return (
+              <div className="mb-4 pt-3 border-t border-[var(--border)]/60">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-zinc-600 font-mono">Bills This Month</p>
+                  <p className="text-sm font-bold text-emerald-400 tabular-nums">{kpiFmt(thisMonthTotal)}</p>
+                </div>
+                <p className="text-[9px] text-zinc-700 font-mono mb-1.5">{thisMonthBills.length} of {openBills.length} due by month-end</p>
+                <div className="space-y-0.5">
+                  {nextBills.map(b => {
+                    const label = b.due_date ? taskDueLabel(b.due_date) : null;
+                    return (
+                      <div key={b.id} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-zinc-800/50 transition-colors">
+                        <span className="text-[10px] font-bold text-emerald-400 shrink-0">$</span>
+                        <p className="text-[11px] text-zinc-300 flex-1 truncate">{b.title}</p>
+                        {b.bill_amount != null && (
+                          <span className="text-[10px] text-emerald-400/70 font-mono tabular-nums shrink-0">
+                            ${b.bill_amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </span>
+                        )}
+                        {label && <span className={`text-[9px] font-mono shrink-0 ${label.color}`}>{label.text}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Liabilities */}
+          <div className="pt-3 border-t border-[var(--border)]/60">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-zinc-600 font-mono">Total Liabilities</p>
+              <p className="text-sm font-bold text-red-400 tabular-nums">{kpiFmt(nwCurrent ? nwCurrent.accounts.filter((a: {category: string}) => LIABILITY_CATS.includes(a.category)).reduce((s: number, a: {balance: number}) => s + a.balance, 0) : 0)}</p>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-zinc-600 font-mono">Credit Cards</p>
+              <p className="text-sm font-bold text-zinc-400 tabular-nums">{kpiFmt(nwCurrent ? nwCurrent.accounts.filter((a: {category: string}) => a.category === 'credit_card').reduce((s: number, a: {balance: number}) => s + a.balance, 0) : 0)}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-zinc-600 font-mono">Loans</p>
+              <p className="text-sm font-bold text-zinc-400 tabular-nums">{kpiFmt(nwCurrent ? nwCurrent.accounts.filter((a: {category: string}) => ['auto_loan', 'personal_loan'].includes(a.category)).reduce((s: number, a: {balance: number}) => s + a.balance, 0) : 0)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ── News headlines ── */}
-      {topNews.length > 0 && (
-        <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-4">Top Stories</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {topNews.map((item, i) => {
-              const color = CATEGORY_COLORS[item.category] ?? 'text-zinc-400';
-              return (
-                <a key={i} href={item.link} target="_blank" rel="noopener noreferrer"
-                  className="group flex flex-col gap-1.5 p-3 rounded-lg border border-zinc-800 hover:border-zinc-600 bg-zinc-900/30 hover:bg-zinc-900/60 transition-colors">
-                  <p className="text-sm font-medium text-zinc-200 group-hover:text-white leading-snug line-clamp-2 transition-colors">
-                    {item.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-auto">
-                    <span className={`text-xs font-bold font-mono ${color}`}>{item.category}</span>
-                    <span className="text-xs text-zinc-700">·</span>
-                    <span className="text-xs text-zinc-600">{timeAgo(item.pubDate)}</span>
-                  </div>
-                </a>
-              );
-            })}
+      {/* ── Sports Ticker ── */}
+      {teamFeeds.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-[var(--border)]/40 bg-[var(--card)]/30">
+          <div className="flex items-center">
+            <span className="text-[9px] font-bold font-mono text-emerald-400 bg-zinc-900 px-2.5 py-1.5 shrink-0 border-r border-[var(--border)]/40">SCORES</span>
+            <div className="overflow-hidden flex-1">
+              <div className="ticker-track flex items-center gap-8 px-4 py-1.5 whitespace-nowrap" style={{ width: 'max-content', animationDuration: '40s' }}>
+                {[...teamFeeds, ...teamFeeds].map((feed, i) => {
+                  const { team, liveGame, lastGame, nextGame, standings } = feed;
+                  const game = liveGame ?? lastGame ?? nextGame;
+                  const isLive = !!liveGame;
+                  const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-500';
+                  const espnUrl = game?.id ? `https://www.espn.com/${feed.team.league.toLowerCase()}/game/_/gameId/${game.id}` : null;
+                  const streakColor = standings?.streak?.startsWith('W') ? 'text-emerald-400' : standings?.streak?.startsWith('L') ? 'text-red-400' : 'text-zinc-500';
+
+                  if (!game) return (
+                    <span key={`${team.id}-${i}`} className="inline-flex items-center gap-2">
+                      <span className={`text-[9px] font-bold font-mono ${leagueColor}`}>{team.league}</span>
+                      <span className="text-[11px] text-zinc-500">{team.abbr}</span>
+                      {standings && <span className="text-[10px] text-zinc-500 font-mono">{standings.record}</span>}
+                      {standings?.streak && <span className={`text-[10px] font-mono font-bold ${streakColor}`}>{standings.streak}</span>}
+                    </span>
+                  );
+
+                  const isNext = !liveGame && !lastGame && !!nextGame;
+                  const Wrapper = espnUrl ? 'a' : 'span';
+                  const wrapperProps = espnUrl ? { href: espnUrl, target: '_blank' as const, rel: 'noopener noreferrer' } : {};
+
+                  return (
+                    <Wrapper key={`${team.id}-${i}`} {...wrapperProps} className="inline-flex items-center gap-2 hover:text-white transition-colors">
+                      <span className={`text-[9px] font-bold font-mono ${leagueColor}`}>{team.league}</span>
+                      <span className="text-[11px] text-white font-bold">{team.abbr}</span>
+                      {standings && <span className="text-[10px] text-zinc-600 font-mono">({standings.record})</span>}
+                      {isLive && (
+                        <>
+                          <span className="text-[11px] text-zinc-500">{game.homeAway === 'home' ? 'vs' : '@'} {game.opponentAbbr}</span>
+                          <span className="text-[11px] text-green-400 font-bold font-mono tabular-nums">{game.teamScore || '0'}–{game.opponentScore || '0'}</span>
+                          <span className="flex items-center gap-1 text-[9px] text-green-400"><span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />LIVE</span>
+                        </>
+                      )}
+                      {!isLive && !isNext && game.result && (
+                        <>
+                          <span className={`text-[10px] font-bold font-mono ${game.result === 'W' ? 'text-emerald-400' : 'text-red-400'}`}>{game.result}</span>
+                          <span className="text-[11px] text-zinc-400 font-mono tabular-nums">{game.teamScore}–{game.opponentScore}</span>
+                          <span className="text-[10px] text-zinc-600">{game.homeAway === 'home' ? 'vs' : '@'} {game.opponentAbbr}</span>
+                        </>
+                      )}
+                      {isNext && (
+                        <>
+                          <span className="text-[10px] text-zinc-500">vs {game.opponentAbbr}</span>
+                          <span className="text-[10px] text-zinc-600 font-mono">{new Date(game.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        </>
+                      )}
+                      {standings?.streak && <span className={`text-[9px] font-mono font-bold ${streakColor}`}>{standings.streak}</span>}
+                    </Wrapper>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
-
 
     </div>
   );

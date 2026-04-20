@@ -212,7 +212,7 @@ export default function HealthTab() {
   if (loading) return (
     <div className="space-y-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-28 bg-zinc-950 border border-zinc-800 rounded-2xl animate-pulse" />
+        <div key={i} className="h-28 bg-[var(--card)] border border-zinc-800 rounded-2xl animate-pulse" />
       ))}
     </div>
   );
@@ -322,7 +322,7 @@ export default function HealthTab() {
       </div>
 
       {/* ── Today's Three Scores ── */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+      <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-6">
         <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono mb-6">Today's Scores</p>
         <div className="flex items-start justify-around gap-4">
           <ScoreRing score={todayR?.score ?? null} label="Readiness"
@@ -343,7 +343,7 @@ export default function HealthTab() {
 
       {/* ── Activity Rings + Stats ── */}
       {todayA && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-6">
           <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono mb-5">Activity Rings</p>
           <div className="flex items-center gap-8">
             <ActivityRings move={movePct} exercise={exercisePct} stand={standPct} />
@@ -372,7 +372,7 @@ export default function HealthTab() {
           </div>
 
           {/* Activity metric grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-5 border-t border-zinc-800/60">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-5 border-t border-[var(--border)]/60">
             <MetricCard icon="👟" label="Steps" value={todayA.steps.toLocaleString()}
               sub={`${mToMi(todayA.equivalent_walking_distance)} mi walked`} color="text-amber-400" />
             <MetricCard icon="🔥" label="Active Calories" value={todayA.active_calories}
@@ -389,7 +389,7 @@ export default function HealthTab() {
 
       {/* ── Sleep Last Night ── */}
       {todayS && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-6">
           <div className="flex items-center justify-between mb-5">
             <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono">Sleep</p>
             <div className="flex items-center gap-3">
@@ -482,7 +482,7 @@ export default function HealthTab() {
 
       {/* ── HRV Trend ── */}
       {hrvChart.length > 1 && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono">HRV Trend</p>
@@ -503,7 +503,7 @@ export default function HealthTab() {
               <YAxis tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={28} />
               <Tooltip content={<CustomTooltip />} />
               {avgHRV > 0 && <ReferenceLine y={avgHRV} stroke="#a78bfa" strokeDasharray="4 3" strokeOpacity={0.4} />}
-              <Area type="monotone" dataKey="HRV" stroke="#a78bfa" strokeWidth={2.5} fill="url(#hrvGrad)"
+              <Area type="monotone" dataKey="HRV" stroke="#a78bfa" strokeWidth={3} fill="url(#hrvGrad)"
                 dot={{ fill: '#a78bfa', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -512,7 +512,7 @@ export default function HealthTab() {
 
       {/* ── Sleep Duration Trend ── */}
       {sleepChart.length > 1 && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-5">
           <div className="flex items-center justify-between mb-5">
             <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono">Sleep Duration</p>
             <p className="text-xs text-zinc-600 font-mono">{range} nights · hours</p>
@@ -541,7 +541,7 @@ export default function HealthTab() {
 
       {/* ── Score Trends ── */}
       {trendData.length > 1 && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-5">
           <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono mb-5">Score Trends · {range} days</p>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={trendData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -559,9 +559,9 @@ export default function HealthTab() {
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine y={85} stroke="#34d399" strokeDasharray="4 3" strokeOpacity={0.2} />
               <ReferenceLine y={70} stroke="#fbbf24" strokeDasharray="4 3" strokeOpacity={0.2} />
-              <Area type="monotone" dataKey="Readiness" stroke="#818cf8" strokeWidth={2} fill="url(#rG)" dot={false} connectNulls />
-              <Area type="monotone" dataKey="Sleep"     stroke="#34d399" strokeWidth={2} fill="url(#sG)" dot={false} connectNulls />
-              <Area type="monotone" dataKey="Activity"  stroke="#fbbf24" strokeWidth={2} fill="url(#aG)" dot={false} connectNulls />
+              <Area type="monotone" dataKey="Readiness" stroke="#818cf8" strokeWidth={2.5} fill="url(#rG)" dot={false} connectNulls />
+              <Area type="monotone" dataKey="Sleep"     stroke="#34d399" strokeWidth={2.5} fill="url(#sG)" dot={false} connectNulls />
+              <Area type="monotone" dataKey="Activity"  stroke="#fbbf24" strokeWidth={2.5} fill="url(#aG)" dot={false} connectNulls />
             </AreaChart>
           </ResponsiveContainer>
           <div className="flex gap-5 mt-3">
@@ -576,7 +576,7 @@ export default function HealthTab() {
 
       {/* ── Activity Steps Trend ── */}
       {activityTrend.length > 1 && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-5">
           <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono mb-5">Steps · {range} days</p>
           <ResponsiveContainer width="100%" height={140}>
             <AreaChart data={activityTrend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -590,7 +590,7 @@ export default function HealthTab() {
               <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={28} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="Steps" stroke="#f97316" strokeWidth={2.5} fill="url(#stepsGrad)"
+              <Area type="monotone" dataKey="Steps" stroke="#f97316" strokeWidth={3} fill="url(#stepsGrad)"
                 dot={false} activeDot={{ r: 5, fill: '#f97316' }} />
             </AreaChart>
           </ResponsiveContainer>
@@ -599,7 +599,7 @@ export default function HealthTab() {
 
       {/* ── Readiness Contributors ── */}
       {todayR?.contributors && Object.keys(todayR.contributors).length > 0 && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+        <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-5">
           <p className="text-xs text-zinc-600 uppercase tracking-[0.3em] font-mono mb-5">Readiness Breakdown</p>
           <div className="space-y-3">
             {Object.entries(todayR.contributors).map(([k, v]) => <ContributorBar key={k} label={k} value={v} />)}

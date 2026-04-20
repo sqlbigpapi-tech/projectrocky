@@ -3,7 +3,7 @@ import { sendSMS } from '@/lib/sms';
 import { verifyCronSecret } from '@/lib/cronAuth';
 import { NextResponse } from 'next/server';
 
-const LIABILITY_CATS = ['liability', 'credit_card', 'auto_loan', 'personal_loan'];
+const LIABILITY_CATS = ['credit_card', 'auto_loan', 'personal_loan'];
 
 export async function GET(request: Request) {
   const deny = verifyCronSecret(request);

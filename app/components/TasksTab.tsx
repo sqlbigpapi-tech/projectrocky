@@ -13,6 +13,8 @@ type Task = {
   category: Category;
   completed: boolean;
   recurrence: string | null;
+  is_bill: boolean;
+  bill_amount: number | null;
   created_at: string;
 };
 
@@ -48,20 +50,23 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
   const [category, setCategory] = useState<Category>('Personal');
   const [dueDate, setDueDate] = useState('');
   const [recurrence, setRecurrence] = useState<string | null>(null);
+  const [isBill, setIsBill] = useState(false);
+  const [billAmount, setBillAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     setSaving(true);
+    const amt = isBill && billAmount ? parseFloat(billAmount) : null;
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: title.trim(), notes, priority, category, due_date: dueDate || null, recurrence }),
+      body: JSON.stringify({ title: title.trim(), notes, priority, category, due_date: dueDate || null, recurrence, is_bill: isBill, bill_amount: amt }),
     });
     const { task } = await res.json();
     onAdd(task);
-    setTitle(''); setNotes(''); setPriority('Medium'); setCategory('Personal'); setDueDate(''); setRecurrence(null);
+    setTitle(''); setNotes(''); setPriority('Medium'); setCategory('Personal'); setDueDate(''); setRecurrence(null); setIsBill(false); setBillAmount('');
     setOpen(false);
     setSaving(false);
   }
@@ -70,15 +75,16 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full bg-zinc-950 border border-dashed border-zinc-700 hover:border-amber-500/50 rounded-xl px-5 py-4 text-zinc-500 hover:text-amber-400 text-sm font-medium transition text-left"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-zinc-600 hover:text-amber-400 hover:bg-[var(--card)]/40 transition-all duration-150"
       >
-        + Add task
+        <span className="w-[18px] h-[18px] rounded-md border-2 border-dashed border-zinc-700 flex items-center justify-center text-xs">+</span>
+        <span className="text-[13px]">Add task</span>
       </button>
     );
   }
 
   return (
-    <form onSubmit={submit} className="bg-zinc-950 border border-amber-500/30 rounded-xl p-5 space-y-3">
+    <form onSubmit={submit} className="bg-[var(--card)] border border-amber-500/30 rounded-xl p-5 space-y-3">
       <input
         autoFocus
         type="text"
@@ -94,34 +100,7 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
         rows={2}
         className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-xs text-zinc-300 placeholder-zinc-700 resize-none focus:outline-none transition"
       />
-      <div className="flex flex-wrap gap-3">
-        {/* Priority */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Priority</label>
-          <div className="flex gap-1.5">
-            {(['High', 'Medium', 'Low'] as Priority[]).map(p => (
-              <button
-                key={p} type="button"
-                onClick={() => setPriority(p)}
-                className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${priority === p ? PRIORITY_STYLES[p] : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
-              >{p}</button>
-            ))}
-          </div>
-        </div>
-        {/* Category */}
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Category</label>
-          <div className="flex gap-1.5">
-            {(['Business', 'Personal'] as Category[]).map(c => (
-              <button
-                key={c} type="button"
-                onClick={() => setCategory(c)}
-                className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${category === c ? CATEGORY_STYLES[c] : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
-              >{c}</button>
-            ))}
-          </div>
-        </div>
-        {/* Due date */}
+      <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Due Date</label>
           <input
@@ -147,6 +126,32 @@ function AddTaskForm({ onAdd }: { onAdd: (task: Task) => void }) {
             >↻ Monthly</button>
           </div>
         </div>
+        {/* Bill toggle */}
+        <div className="flex flex-col gap-1 justify-end">
+          <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Type</label>
+          <button
+            type="button"
+            onClick={() => setIsBill(b => !b)}
+            className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${isBill ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
+          >$ Bill</button>
+        </div>
+        {isBill && (
+          <div className="flex flex-col gap-1 justify-end">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Amount</label>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={billAmount}
+                onChange={e => setBillAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-28 pl-6 pr-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800 focus:border-emerald-500/40 text-xs text-white font-mono tabular-nums placeholder-zinc-700 focus:outline-none transition"
+              />
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex gap-2 pt-1">
         <button
@@ -175,6 +180,8 @@ function TaskCard({ task, onUpdate, onDelete }: {
   const [editCategory, setEditCategory] = useState<Category>(task.category);
   const [editDueDate, setEditDueDate] = useState(task.due_date ?? '');
   const [editRecurrence, setEditRecurrence] = useState<string | null>(task.recurrence);
+  const [editIsBill, setEditIsBill] = useState(task.is_bill);
+  const [editBillAmount, setEditBillAmount] = useState(task.bill_amount != null ? String(task.bill_amount) : '');
   const [saving, setSaving] = useState(false);
   const due = dueDateLabel(task.due_date);
 
@@ -185,6 +192,8 @@ function TaskCard({ task, onUpdate, onDelete }: {
     setEditCategory(task.category);
     setEditDueDate(task.due_date ?? '');
     setEditRecurrence(task.recurrence);
+    setEditIsBill(task.is_bill);
+    setEditBillAmount(task.bill_amount != null ? String(task.bill_amount) : '');
     setEditing(true);
     setExpanded(false);
   }
@@ -199,6 +208,8 @@ function TaskCard({ task, onUpdate, onDelete }: {
       category: editCategory,
       due_date: editDueDate || null,
       recurrence: editRecurrence,
+      is_bill: editIsBill,
+      bill_amount: editIsBill && editBillAmount ? parseFloat(editBillAmount) : null,
     };
     await onUpdate(task.id, patch);
     setEditing(false);
@@ -207,7 +218,7 @@ function TaskCard({ task, onUpdate, onDelete }: {
 
   if (editing) {
     return (
-      <div className="bg-zinc-950 border border-amber-500/30 rounded-xl p-5 space-y-3">
+      <div className="bg-[var(--card)] border border-amber-500/30 rounded-xl p-5 space-y-3">
         <input
           autoFocus
           type="text"
@@ -264,6 +275,24 @@ function TaskCard({ task, onUpdate, onDelete }: {
               </button>
             </div>
           </div>
+          <div className="flex flex-col gap-1 justify-end">
+            <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Type</label>
+            <button type="button" onClick={() => setEditIsBill(b => !b)}
+              className={`text-xs font-bold px-2.5 py-1 rounded-lg border transition ${editIsBill ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}>
+              $ Bill
+            </button>
+          </div>
+          {editIsBill && (
+            <div className="flex flex-col gap-1 justify-end">
+              <label className="text-xs text-zinc-600 font-mono uppercase tracking-widest">Amount</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">$</span>
+                <input type="number" min="0" step="0.01" value={editBillAmount} onChange={e => setEditBillAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-28 pl-6 pr-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800 focus:border-emerald-500/40 text-xs text-white font-mono tabular-nums placeholder-zinc-700 focus:outline-none transition" />
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={saveEdit} disabled={saving || !editTitle.trim()}
@@ -284,49 +313,56 @@ function TaskCard({ task, onUpdate, onDelete }: {
   }
 
   return (
-    <div className={`bg-zinc-950 rounded-xl border transition-colors ${
-      task.completed ? 'border-zinc-800 opacity-50' :
-      task.priority === 'High' ? 'border-red-500/20' :
-      task.priority === 'Medium' ? 'border-amber-500/20' :
-      'border-zinc-800'
+    <div className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 ${
+      task.completed ? 'opacity-35' :
+      due?.text.includes('overdue') ? 'bg-red-500/5 hover:bg-red-500/8' :
+      due?.text === 'Due today' ? 'bg-amber-500/5 hover:bg-amber-500/8' :
+      'hover:bg-[var(--card)]/60'
     }`}>
-      <div className="flex items-start gap-3 p-4">
-        {/* Checkbox */}
-        <button
-          onClick={() => onUpdate(task.id, { completed: !task.completed })}
-          className={`mt-0.5 w-4 h-4 rounded border shrink-0 flex items-center justify-center transition ${
-            task.completed ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600 hover:border-amber-400'
-          }`}
-        >
-          {task.completed && <span className="text-black text-xs font-bold">✓</span>}
-        </button>
-
-        {/* Content */}
+      <button
+        onClick={() => onUpdate(task.id, { completed: !task.completed })}
+        className={`w-[18px] h-[18px] rounded-md border-2 shrink-0 flex items-center justify-center transition-all duration-150 ${
+          task.completed ? 'bg-emerald-500 border-emerald-500' :
+          due?.text.includes('overdue') ? 'border-red-400/40 hover:border-red-400 hover:bg-red-500/10' :
+          'border-zinc-700 hover:border-amber-400 hover:bg-amber-500/10'
+        }`}
+      >
+        {task.completed && (
+          <svg className="w-2.5 h-2.5 text-black" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 6l3 3 5-5" />
+          </svg>
+        )}
+      </button>
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        {task.is_bill && (
+          <span
+            className={`shrink-0 w-[18px] h-[18px] rounded-md flex items-center justify-center text-[11px] font-bold font-mono border ${task.completed ? 'bg-zinc-900 text-zinc-600 border-zinc-800' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
+            title="Bill"
+          >
+            $
+          </span>
+        )}
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium leading-snug ${task.completed ? 'line-through text-zinc-600' : 'text-white'}`}>
-            {task.title}
-          </p>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-md border font-mono ${PRIORITY_STYLES[task.priority]}`}>
-              {task.priority}
-            </span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-md border font-mono ${CATEGORY_STYLES[task.category]}`}>
-              {task.category}
-            </span>
-            {due && <span className={`text-xs font-mono ${due.color}`}>{due.text}</span>}
-            {task.recurrence === 'daily' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ daily</span>}
-            {task.recurrence === 'monthly' && <span className="text-xs font-bold px-2 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono">↻ monthly</span>}
-          </div>
-          {task.notes && (
-            <p className="text-xs text-zinc-600 mt-1.5 truncate">{task.notes}</p>
-          )}
+          <p className={`text-[13px] leading-snug ${task.completed ? 'line-through text-zinc-600' : 'text-zinc-200'}`}>{task.title}</p>
+          {task.notes && !task.completed && <p className="text-[10px] text-zinc-600 truncate mt-0.5">{task.notes}</p>}
         </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          <button onClick={startEdit} className="text-zinc-600 hover:text-amber-400 text-xs transition px-1" title="Edit">✎</button>
-          <button onClick={() => onDelete(task.id)} className="text-zinc-600 hover:text-red-400 text-xs transition px-1" title="Delete">✕</button>
-        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {task.is_bill && task.bill_amount != null && (
+          <span className={`text-[11px] font-mono font-bold tabular-nums ${task.completed ? 'text-zinc-600' : 'text-emerald-400'}`}>
+            ${task.bill_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        )}
+        {task.recurrence && <span className="text-[10px] text-cyan-400/60 font-mono px-1.5 py-0.5 rounded-md bg-cyan-500/5">↻ {task.recurrence}</span>}
+        {due && !task.completed && <span className={`text-[10px] font-mono ${due.color}`}>{due.text}</span>}
+      </div>
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <button onClick={startEdit} className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
+          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
+        </button>
+        <button onClick={() => onDelete(task.id)} className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
+          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h8M4 3V2h4v1M3 3v7a1 1 0 001 1h4a1 1 0 001-1V3" /></svg>
+        </button>
       </div>
     </div>
   );
@@ -361,7 +397,7 @@ function CalendarView({ tasks, onUpdate }: { tasks: Task[]; onUpdate: (id: strin
   const todayISO = today.toISOString().split('T')[0];
 
   return (
-    <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-[var(--card)] rounded-xl border border-zinc-800 overflow-hidden">
       {/* Month nav */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
         <button onClick={() => setCalDate(new Date(year, month - 1, 1))} className="text-zinc-500 hover:text-white transition px-2 py-1 text-sm">‹</button>
@@ -385,7 +421,7 @@ function CalendarView({ tasks, onUpdate }: { tasks: Task[]; onUpdate: (id: strin
           const dayTasks = iso ? (tasksByDate[iso] ?? []) : [];
           const isToday = iso === todayISO;
           return (
-            <div key={i} className={`min-h-[72px] border-b border-r border-zinc-800/60 p-1.5 ${!day ? 'bg-zinc-900/20' : ''}`}>
+            <div key={i} className={`min-h-[72px] border-b border-r border-[var(--border)]/60 p-1.5 ${!day ? 'bg-zinc-900/20' : ''}`}>
               {day && (
                 <>
                   <p className={`text-xs font-mono mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-amber-500 text-black font-bold' : 'text-zinc-500'}`}>
@@ -399,6 +435,7 @@ function CalendarView({ tasks, onUpdate }: { tasks: Task[]; onUpdate: (id: strin
                         className={`w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-xs leading-tight transition hover:opacity-70 ${t.completed ? 'opacity-40' : ''}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${PRIORITY_DOT[t.priority]}`} />
+                        {t.is_bill && <span className="shrink-0 text-[10px] font-bold text-emerald-400 leading-none" title="Bill">$</span>}
                         <span className={`truncate ${t.completed ? 'line-through text-zinc-600' : 'text-zinc-300'}`}>{t.title}</span>
                       </button>
                     ))}
@@ -488,9 +525,13 @@ export default function TasksTab() {
 
   const filtered = tasks.filter(t => {
     if (!showCompleted && t.completed) return false;
-    if (categoryFilter !== 'All' && t.category !== categoryFilter) return false;
-    if (priorityFilter !== 'All' && t.priority !== priorityFilter) return false;
     return true;
+  }).sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    if (a.due_date && !b.due_date) return -1;
+    if (!a.due_date && b.due_date) return 1;
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    return 0;
   });
 
   const open = tasks.filter(t => !t.completed);
@@ -500,25 +541,51 @@ export default function TasksTab() {
     return new Date(t.due_date + 'T00:00:00') < today;
   });
 
+  // Group tasks by time bucket
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString().split('T')[0];
+  const weekEnd = new Date(today.getTime() + 7 * 86400000).toISOString().split('T')[0];
+
+  type Bucket = { key: string; label: string; color: string; icon: string; tasks: typeof filtered };
+  const buckets: Bucket[] = [];
+
+  const overdueItems = filtered.filter(t => !t.completed && t.due_date && t.due_date < todayISO);
+  const todayItems = filtered.filter(t => !t.completed && t.due_date === todayISO);
+  const weekItems = filtered.filter(t => !t.completed && t.due_date && t.due_date > todayISO && t.due_date <= weekEnd);
+  const laterItems = filtered.filter(t => !t.completed && t.due_date && t.due_date > weekEnd);
+  const noDueItems = filtered.filter(t => !t.completed && !t.due_date);
+  const completedItems = filtered.filter(t => t.completed);
+
+  if (overdueItems.length > 0) buckets.push({ key: 'overdue', label: 'Overdue', color: 'text-red-400', icon: '!', tasks: overdueItems });
+  if (todayItems.length > 0) buckets.push({ key: 'today', label: 'Today', color: 'text-amber-400', icon: '◉', tasks: todayItems });
+  if (weekItems.length > 0) buckets.push({ key: 'week', label: 'This Week', color: 'text-blue-400', icon: '→', tasks: weekItems });
+  if (laterItems.length > 0) buckets.push({ key: 'later', label: 'Upcoming', color: 'text-zinc-400', icon: '◦', tasks: laterItems });
+  if (noDueItems.length > 0) buckets.push({ key: 'nodate', label: 'No Due Date', color: 'text-zinc-600', icon: '—', tasks: noDueItems });
+  if (completedItems.length > 0) buckets.push({ key: 'done', label: 'Completed', color: 'text-emerald-400/50', icon: '✓', tasks: completedItems });
+
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Tasks</h2>
-          <p className="text-xs text-zinc-500 mt-0.5 font-mono">
-            {open.length} open{overdue.length > 0 ? ` · ${overdue.length} overdue` : ''}
-          </p>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-baseline gap-3">
+          <p className="text-sm font-medium text-white">{open.length} <span className="text-zinc-500">open</span></p>
+          {overdue.length > 0 && <p className="text-sm font-medium text-red-400">{overdue.length} <span className="text-red-400/60">overdue</span></p>}
         </div>
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setView('list')}
-            className={`text-xs font-mono px-3 py-1 rounded-md transition ${view === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}
-          >List</button>
-          <button
-            onClick={() => setView('calendar')}
-            className={`text-xs font-mono px-3 py-1 rounded-md transition ${view === 'calendar' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}
-          >Calendar</button>
+            onClick={() => setShowCompleted(s => !s)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono border transition ${
+              showCompleted ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'text-zinc-600 border-zinc-800 hover:text-white'
+            }`}>
+            {showCompleted ? 'Done ✓' : 'Done'}
+          </button>
+          <div className="flex gap-0.5 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+            <button onClick={() => setView('list')}
+              className={`text-[10px] font-mono px-2.5 py-1 rounded-md transition ${view === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}>List</button>
+            <button onClick={() => setView('calendar')}
+              className={`text-[10px] font-mono px-2.5 py-1 rounded-md transition ${view === 'calendar' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-white'}`}>Cal</button>
+          </div>
         </div>
       </div>
 
@@ -528,59 +595,41 @@ export default function TasksTab() {
 
       {view === 'list' && <>
 
-      {/* Summary pills */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {([['All', null], ['Business', 'Business'], ['Personal', 'Personal']] as [string, Category | null][]).map(([label, val]) => (
-          <button key={label}
-            onClick={() => setCategoryFilter(val ?? 'All')}
-            className={`rounded-xl border p-3 text-left transition ${categoryFilter === (val ?? 'All') ? 'bg-amber-500/10 border-amber-500/30' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'}`}>
-            <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">{label}</p>
-            <p className="text-2xl font-bold text-white tabular-nums">
-              {label === 'All' ? open.length : tasks.filter(t => !t.completed && t.category === val).length}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {(['All', 'High', 'Medium', 'Low'] as (Priority | 'All')[]).map(p => (
-          <button key={p} onClick={() => setPriorityFilter(p)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono border transition ${
-              priorityFilter === p
-                ? p === 'All' ? 'bg-zinc-700 text-white border-zinc-600' : PRIORITY_STYLES[p as Priority]
-                : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:text-white hover:border-zinc-600'
-            }`}>{p}</button>
-        ))}
-        <button
-          onClick={() => setShowCompleted(s => !s)}
-          className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-bold font-mono border transition ${
-            showCompleted ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:text-white'
-          }`}>
-          {showCompleted ? 'Hide Completed' : 'Show Completed'}
-        </button>
-      </div>
-
       {/* Add task */}
-      <div className="mb-4">
+      <div className="mb-5">
         <AddTaskForm onAdd={task => setTasks(prev => [task, ...prev])} />
       </div>
 
-      {/* Task list */}
+      {/* Task list grouped by bucket */}
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 animate-pulse h-16" />
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton h-11 w-full rounded-xl" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
-          {tasks.length === 0 ? 'No tasks yet. Add one above.' : 'No tasks match your filters.'}
+      ) : buckets.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+            <span className="text-xl text-zinc-600">✓</span>
+          </div>
+          <p className="text-sm text-zinc-600">All clear. Nice work.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map(task => (
-            <TaskCard key={task.id} task={task} onUpdate={handleUpdate} onDelete={handleDelete} />
+        <div className="space-y-5">
+          {buckets.map(bucket => (
+            <div key={bucket.key}>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className={`text-xs font-bold ${bucket.color}`}>{bucket.icon}</span>
+                <span className={`text-[11px] font-bold font-mono uppercase tracking-widest ${bucket.color}`}>{bucket.label}</span>
+                <span className="text-[10px] text-zinc-700 font-mono">{bucket.tasks.length}</span>
+                <div className="flex-1 h-px bg-zinc-800/60 ml-2" />
+              </div>
+              <div className="space-y-0.5">
+                {bucket.tasks.map(task => (
+                  <TaskCard key={task.id} task={task} onUpdate={handleUpdate} onDelete={handleDelete} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

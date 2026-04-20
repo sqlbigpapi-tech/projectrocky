@@ -1,5 +1,8 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts';
 
 const GOAL_MIA = 1001000; // fallback for when months haven't loaded yet
 const DEFAULT_bigGoal = 1700000;
@@ -89,10 +92,10 @@ export default function IncomeTab() {
   const [editingBigGoal, setEditingBigGoal] = useState(false);
   const [bigGoalInput, setBigGoalInput] = useState('');
   const [customMonthly, setCustomMonthly] = useState('');
-  const [recs, setRecs] = useState<{ category: string; priority: string; recommendation: string }[]>([]);
-  const [recsLoading, setRecsLoading] = useState(false);
-  const [recsError, setRecsError] = useState('');
-  const [recsGeneratedAt, setRecsGeneratedAt] = useState('');
+  const [trailing12, setTrailing12] = useState<number | null>(null);
+  const [equityMonths, setEquityMonths] = useState<{ month: number; trailing12: number; isForecast: boolean }[]>([]);
+  const [priorYearNI, setPriorYearNI] = useState<Record<number, number>>({});
+  const [uipRunRate, setUipRunRate] = useState(120000);
 
   useEffect(() => {
     setLoading(true);
@@ -108,6 +111,21 @@ export default function IncomeTab() {
     fetch(`/api/settings?key=big_uip_goal_${market}`)
       .then(r => r.json())
       .then(d => { if (d.value) setBigGoal(Number(d.value)); });
+    fetch('/api/equity?year=2026')
+      .then(r => r.json())
+      .then(d => {
+        if (d.latest?.trailing12 != null) setTrailing12(d.latest.trailing12);
+        if (d.months) setEquityMonths(d.months.map((m: any) => ({ month: m.month, trailing12: m.trailing12, isForecast: m.isForecast })));
+      })
+      .catch(() => {});
+    fetch('/api/pl?year=2025')
+      .then(r => r.json())
+      .then(d => {
+        const byMonth: Record<number, number> = {};
+        for (const m of d.months ?? []) byMonth[m.month] = m.net_income;
+        setPriorYearNI(byMonth);
+      })
+      .catch(() => {});
   }, [market]);
 
 
@@ -135,26 +153,6 @@ export default function IncomeTab() {
     const { month: updated } = await res.json();
     setMonths(prev => prev.map(m => m.month === month ? { ...m, ...updated } : m));
     setSaving(null);
-  }
-
-  async function getRecommendations() {
-    setRecsLoading(true);
-    setRecsError('');
-    try {
-      const res = await fetch('/api/income/recommendations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ months, bigGoal }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch');
-      setRecs(data.recommendations);
-      setRecsGeneratedAt(data.generatedAt);
-    } catch (e: any) {
-      setRecsError(e.message || 'Failed to fetch recommendations');
-    } finally {
-      setRecsLoading(false);
-    }
   }
 
   async function handleClear(month: number) {
@@ -191,11 +189,60 @@ export default function IncomeTab() {
   const forecastPct = Math.min(100 - actualPct, (forecastTotal / GOAL) * 100);
   const planPct = Math.min(100, (planYtd / GOAL) * 100);
 
-  // BIG UIP goal stats
-  const bigPct = (ytd / bigGoal) * 100;
-  const bigActualPct = Math.min(100, (actualTotal / bigGoal) * 100);
-  const bigForecastPct = Math.min(100 - bigActualPct, (forecastTotal / bigGoal) * 100);
-  const bigRemaining = Math.max(0, bigGoal - ytd);
+  // BIG UIP goal stats — based on Trailing 12 months, not YTD
+  const t12Value = trailing12 ?? 0;
+  const bigPct = (t12Value / bigGoal) * 100;
+  const bigRemaining = Math.max(0, bigGoal - t12Value);
+
+  // UIP T12 projection chart data
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const uipChartData = useMemo(() => {
+    // Actual T12 history from equity months
+    const lastActualMonth = equityMonths.filter(m => !m.isForecast).length;
+    const data: { label: string; t12: number; projected: number | null; type: 'actual' | 'projected' }[] = [];
+
+    // Add actual months
+    for (const m of equityMonths.filter(em => !em.isForecast)) {
+      data.push({ label: MONTH_SHORT[m.month - 1] + ' 26', t12: m.trailing12, projected: m.trailing12, type: 'actual' });
+    }
+
+    // Project forward from last actual T12 using run rate
+    if (lastActualMonth > 0 && Object.keys(priorYearNI).length > 0) {
+      let projT12 = equityMonths[lastActualMonth - 1]?.trailing12 ?? t12Value;
+      // 2026 actuals for months 1-lastActual (needed for rolloff in 2027)
+      const actuals2026: Record<number, number> = {};
+      for (const m of months.filter(mo => mo.actual != null)) actuals2026[m.month] = m.actual!;
+
+      for (let m = lastActualMonth + 1; m <= 24; m++) {
+        const calMonth = ((m - 1) % 12) + 1;
+        const year = m <= 12 ? 26 : 27;
+        // What rolls off: if projecting into 2026, roll off 2025. Into 2027, roll off 2026.
+        let rolloff = 0;
+        if (m <= 12) {
+          rolloff = priorYearNI[calMonth] ?? 0;
+        } else {
+          rolloff = actuals2026[calMonth] ?? uipRunRate; // if no actual, assume prior run rate
+        }
+        projT12 = projT12 - rolloff + uipRunRate;
+        data.push({ label: MONTH_SHORT[calMonth - 1] + ' ' + year, t12: projT12, projected: projT12, type: 'projected' });
+        // Stop if we've gone far enough
+        if (m > 18) break;
+      }
+    }
+
+    return data;
+  }, [equityMonths, priorYearNI, uipRunRate, t12Value, months]);
+
+  // Find if/when projection hits goal
+  const hitMonth = uipChartData.find(d => d.type === 'projected' && d.t12 >= bigGoal);
+  const plateauValue = uipRunRate * 12;
+  const breakEvenRate = Math.ceil(bigGoal / 12);
+  const willNeverHit = plateauValue < bigGoal;
+  const uipVerdict = hitMonth
+    ? `At ${fmt(uipRunRate)}/mo you hit ${fmt(bigGoal)} by ${hitMonth.label}. Amaze amaze amaze!`
+    : willNeverHit
+      ? `At ${fmt(uipRunRate)}/mo T12 caps at ${fmt(plateauValue)} — will never reach ${fmt(bigGoal)}. Need ${fmt(breakEvenRate)}/mo minimum.`
+      : `At ${fmt(uipRunRate)}/mo you hit ${fmt(bigGoal)}. Check the chart for timing.`;
 
   // Running totals
   let running = 0;
@@ -219,7 +266,7 @@ export default function IncomeTab() {
     return (
       <div className="space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-16 bg-zinc-950 border border-zinc-800 rounded-xl animate-pulse" />
+          <div key={i} className="h-16 bg-[var(--card)] border border-zinc-800 rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -272,7 +319,7 @@ export default function IncomeTab() {
             <div className="absolute top-0 h-full bg-emerald-400/30 rounded-full" style={{ left: `${actualPct}%`, width: `${forecastPct}%` }} />
             <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${actualPct}%`, background: 'linear-gradient(90deg, #059669, #34d399)' }} />
           </div>
-          <div className="flex items-center gap-4 bg-zinc-900/60 rounded-xl px-4 py-3 border border-zinc-800 mb-4">
+          <div className="flex items-center gap-4 bg-[var(--card)]/60 rounded-xl px-4 py-3 border border-zinc-800 mb-4">
             <p className="text-xs text-zinc-500 font-mono flex-1">Remaining to {fmt(GOAL)}</p>
             <p className="text-lg font-bold text-amber-400 tabular-nums">{fmtFull(remaining)}</p>
             <div className="text-right text-xs font-mono">
@@ -281,43 +328,84 @@ export default function IncomeTab() {
             </div>
           </div>
 
-          {/* BIG UIP Goal Progress */}
-          <div className="flex items-center gap-2 mb-1.5">
-            <p className="text-xs text-violet-400/70 font-mono uppercase tracking-widest">BIG UIP ·</p>
-            {editingBigGoal ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  type="number"
-                  value={bigGoalInput}
-                  onChange={e => setBigGoalInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveBigGoal(); if (e.key === 'Escape') setEditingBigGoal(false); }}
-                  placeholder={String(bigGoal)}
-                  className="w-28 bg-zinc-900 border border-violet-700/40 focus:border-violet-500/60 rounded px-2 py-0.5 text-xs text-violet-300 font-mono focus:outline-none"
-                />
-                <button onClick={saveBigGoal} className="text-xs text-violet-400 hover:text-violet-300 font-mono transition-colors">save</button>
-                <button onClick={() => setEditingBigGoal(false)} className="text-xs text-zinc-600 hover:text-red-400 transition-colors">✕</button>
+          {/* UIP T12 Projection */}
+          <div className="bg-[var(--card)]/30 rounded-xl border border-violet-800/20 p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-violet-400/70 font-mono uppercase tracking-widest">UIP · Rolling 12</p>
+                <span className="text-xs text-violet-400 font-bold font-mono">{bigPct.toFixed(0)}%</span>
               </div>
-            ) : (
-              <button
-                onClick={() => { setBigGoalInput(String(bigGoal)); setEditingBigGoal(true); }}
-                className="text-xs text-violet-400/70 font-mono uppercase tracking-widest hover:text-violet-300 transition-colors border-b border-dashed border-violet-700/40"
-              >
-                {fmt(bigGoal)} Target
-              </button>
-            )}
-          </div>
-          <div className="relative h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
-            <div className="absolute top-0 h-full bg-violet-400/30 rounded-full" style={{ left: `${bigActualPct}%`, width: `${bigForecastPct}%` }} />
-            <div className="absolute left-0 top-0 h-full rounded-full" style={{ width: `${bigActualPct}%`, background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
-          </div>
-          <div className="flex items-center gap-4 bg-violet-950/20 rounded-xl px-4 py-3 border border-violet-800/20 mb-4">
-            <p className="text-xs text-violet-400/70 font-mono flex-1">Remaining to {fmt(bigGoal)}</p>
-            <p className="text-lg font-bold text-violet-300 tabular-nums">{fmtFull(bigRemaining)}</p>
-            <div className="text-right text-xs font-mono">
-              <p className="text-zinc-500">{fmt(remainingMonths > 0 ? bigRemaining / remainingMonths : 0)}/mo needed</p>
-              <p className="text-violet-400">{bigPct.toFixed(1)}% there</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-600 font-mono">Run rate</span>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-600 text-[10px]">$</span>
+                    <input
+                      type="number"
+                      step="5000"
+                      value={uipRunRate}
+                      onChange={e => setUipRunRate(Number(e.target.value) || 0)}
+                      className="w-24 pl-5 pr-2 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-violet-400 font-mono tabular-nums focus:outline-none focus:border-violet-500/40 transition-colors"
+                    />
+                  </div>
+                  <span className="text-[10px] text-zinc-600 font-mono">/mo</span>
+                </div>
+                {editingBigGoal ? (
+                  <div className="flex items-center gap-1">
+                    <input autoFocus type="number" value={bigGoalInput} onChange={e => setBigGoalInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveBigGoal(); if (e.key === 'Escape') setEditingBigGoal(false); }}
+                      className="w-24 bg-zinc-900 border border-violet-700/40 rounded px-2 py-1 text-[11px] text-violet-300 font-mono focus:outline-none" />
+                    <button onClick={saveBigGoal} className="text-[10px] text-violet-400 font-mono">save</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setBigGoalInput(String(bigGoal)); setEditingBigGoal(true); }}
+                    className="text-[10px] text-zinc-600 font-mono hover:text-violet-400 transition-colors">
+                    Goal: {fmt(bigGoal)}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Summary row */}
+            <div className="flex items-center gap-6 mb-3">
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono">T12 Now</p>
+                <p className="text-lg font-bold text-violet-400 tabular-nums">{fmt(t12Value)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono">Remaining</p>
+                <p className="text-sm font-bold text-zinc-400 tabular-nums">{fmt(bigRemaining)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-600 font-mono">Break-even</p>
+                <p className="text-sm font-bold text-zinc-400 tabular-nums">{fmt(breakEvenRate)}/mo</p>
+              </div>
+            </div>
+
+            {/* Chart */}
+            {uipChartData.length > 0 && (
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={uipChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+                  <XAxis dataKey="label" tick={{ fill: '#a1a1aa', fontSize: 9, fontFamily: 'monospace' }} axisLine={false} tickLine={false} interval={2} />
+                  <YAxis tickFormatter={v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : `$${Math.round(v/1000)}K`} tick={{ fill: '#a1a1aa', fontSize: 9, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={50} domain={[0, (max: number) => Math.max(max, bigGoal * 1.1)]} />
+                  <Tooltip
+                    contentStyle={{ background: '#111111', border: '1px solid #1f1f1f', borderRadius: 8, fontSize: 11 }}
+                    labelStyle={{ color: '#a1a1aa' }}
+                    formatter={(v: unknown) => ['$' + Math.round(Number(v)).toLocaleString(), 'T12']}
+                  />
+                  <ReferenceLine y={bigGoal} stroke="#818cf8" strokeDasharray="6 4" strokeWidth={1.5} label={{ value: fmt(bigGoal), position: 'right', fill: '#818cf8', fontSize: 9, fontFamily: 'monospace' }} />
+                  <Line type="monotone" dataKey="t12" stroke="#a78bfa" strokeWidth={3} dot={(props: any) => {
+                    const d = uipChartData[props.index];
+                    if (!d) return <circle key={props.index} />;
+                    return <circle key={props.index} cx={props.cx} cy={props.cy} r={d.type === 'actual' ? 3 : 2} fill={d.type === 'actual' ? '#a78bfa' : '#a78bfa50'} stroke={d.type === 'actual' ? '#a78bfa' : 'none'} />;
+                  }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+
+            {/* Verdict */}
+            <p className={`text-xs font-mono mt-2 ${hitMonth ? 'text-emerald-400' : 'text-amber-400'}`}>{uipVerdict}</p>
           </div>
 
           <div className="flex gap-4 text-xs text-zinc-600 font-mono">
@@ -336,7 +424,7 @@ export default function IncomeTab() {
           { label: 'Best Month', value: best ? fmt(best.actual) : '—', sub: best ? MONTH_NAMES[best.month - 1] : '—', color: 'text-amber-400' },
           { label: 'Run Rate Avg', value: fmt(runRate), sub: 'per locked month', color: 'text-blue-400' },
         ].map(kpi => (
-          <div key={kpi.label} className="bg-zinc-950 rounded-xl border border-zinc-800 p-4">
+          <div key={kpi.label} className="bg-[var(--card)] rounded-xl border border-zinc-800 p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-2">{kpi.label}</p>
             <p className={`text-2xl font-bold tabular-nums ${kpi.color}`}>{kpi.value}</p>
             <p className="text-xs text-zinc-600 font-mono mt-1 truncate">{kpi.sub}</p>
@@ -345,7 +433,7 @@ export default function IncomeTab() {
       </div>
 
       {/* Monthly table */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Monthly Breakdown</p>
           <p className="text-xs text-zinc-600 font-mono italic">click a row to update</p>
@@ -372,7 +460,7 @@ export default function IncomeTab() {
                   : '';
 
                 return (
-                  <tr key={m.month} className={`border-b border-zinc-800/60 last:border-0 ${rowBg} hover:bg-zinc-900/40 transition-colors`}>
+                  <tr key={m.month} className={`border-b border-[var(--border)]/60 last:border-0 ${rowBg} hover:bg-[var(--card)]/40 transition-colors`}>
                     {/* Month */}
                     <td className="px-5 py-3 text-left">
                       <span className="text-zinc-300 font-medium">{MONTH_NAMES[m.month - 1]}</span>
@@ -432,7 +520,7 @@ export default function IncomeTab() {
                 );
               })}
               {/* Total row */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/40">
+              <tr className="border-t border-zinc-700 bg-[var(--card)]/40">
                 <td className="px-5 py-3 text-left font-bold text-zinc-300 font-mono text-xs uppercase tracking-widest">Full Year</td>
                 <td className="px-5 py-3 text-right font-mono text-zinc-500">{fmt(months.reduce((s, m) => s + m.plan, 0))}</td>
                 <td className="px-5 py-3 text-right font-mono text-emerald-400 font-bold">{fmt(ytd)} so far</td>
@@ -452,7 +540,7 @@ export default function IncomeTab() {
       </div>
 
       {/* Scenarios */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
+      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
         <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-4">
           {remainingMonths > 0 ? `Run Rate Scenarios · ${remainingMonths} open months remaining` : 'All months locked — full year complete'}
         </p>
@@ -462,7 +550,7 @@ export default function IncomeTab() {
             const over = projected - GOAL;
             const bigOver = projected - bigGoal;
             return (
-              <div key={sc.name} className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-4">
+              <div key={sc.name} className="bg-[var(--card)]/60 rounded-xl border border-zinc-800 p-4">
                 <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-2">{sc.name}</p>
                 <p className="text-2xl font-bold text-emerald-400 tabular-nums">{fmtFull(Math.round(projected))}</p>
                 <p className="text-xs text-zinc-600 font-mono mt-1">
@@ -494,7 +582,7 @@ export default function IncomeTab() {
             const over = projected != null ? projected - GOAL : null;
             const bigOver = projected != null ? projected - bigGoal : null;
             return (
-              <div className="bg-zinc-900/60 rounded-xl border border-amber-800/30 p-4">
+              <div className="bg-[var(--card)]/60 rounded-xl border border-amber-800/30 p-4">
                 <p className="text-xs text-amber-400/70 uppercase tracking-widest font-mono mb-2">What If</p>
                 <div className="mb-3">
                   <div className="flex items-center gap-1.5">
@@ -504,7 +592,7 @@ export default function IncomeTab() {
                       value={customMonthly}
                       onChange={e => setCustomMonthly(e.target.value)}
                       placeholder="enter monthly"
-                      className="w-full bg-zinc-950 border border-zinc-700 focus:border-amber-500/40 rounded-lg px-2 py-1.5 text-lg font-bold text-amber-400 font-mono tabular-nums focus:outline-none placeholder:text-zinc-700 placeholder:text-sm placeholder:font-normal"
+                      className="w-full bg-[var(--card)] border border-zinc-700 focus:border-amber-500/40 rounded-lg px-2 py-1.5 text-lg font-bold text-amber-400 font-mono tabular-nums focus:outline-none placeholder:text-zinc-700 placeholder:text-sm placeholder:font-normal"
                     />
                   </div>
                   <p className="text-xs text-zinc-600 font-mono mt-1">/mo · {remainingMonths} months left</p>
@@ -534,72 +622,6 @@ export default function IncomeTab() {
             );
           })()}
         </div>
-      </div>
-
-      {/* AI Recommendations */}
-      <div className="bg-zinc-950 rounded-xl border border-zinc-800 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">AI Analysis</p>
-          <button
-            onClick={getRecommendations}
-            disabled={recsLoading || locked.length === 0}
-            className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/30 hover:bg-violet-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {recsLoading ? (
-              <>
-                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Analyzing…
-              </>
-            ) : (
-              <>✦ Get Recommendations</>
-            )}
-          </button>
-        </div>
-
-        {recsError && (
-          <p className="text-xs text-red-400 font-mono mb-3">{recsError}</p>
-        )}
-
-        {recs.length === 0 && !recsLoading && !recsError && (
-          <p className="text-xs text-zinc-600 font-mono">Click "Get Recommendations" to generate AI-powered income analysis based on your YTD performance.</p>
-        )}
-
-        {recs.length > 0 && (
-          <div className="space-y-3">
-            {recs.map((r, i) => (
-              <div
-                key={i}
-                className={`rounded-xl border p-4 ${
-                  r.priority === 'high'
-                    ? 'border-amber-500/30 bg-amber-500/5'
-                    : r.priority === 'medium'
-                    ? 'border-blue-500/30 bg-blue-500/5'
-                    : 'border-zinc-700 bg-zinc-900/40'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded border ${
-                    r.priority === 'high'
-                      ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
-                      : r.priority === 'medium'
-                      ? 'text-blue-400 border-blue-500/30 bg-blue-500/10'
-                      : 'text-zinc-500 border-zinc-700 bg-zinc-800'
-                  }`}>{r.priority}</span>
-                  <span className="text-xs text-zinc-500 font-mono uppercase tracking-widest">{r.category}</span>
-                </div>
-                <p className="text-sm text-zinc-300 leading-relaxed">{r.recommendation}</p>
-              </div>
-            ))}
-            {recsGeneratedAt && (
-              <p className="text-xs text-zinc-700 font-mono text-right">
-                Generated {new Date(recsGeneratedAt).toLocaleString()}
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
     </div>

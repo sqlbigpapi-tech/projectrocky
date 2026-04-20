@@ -7,44 +7,82 @@ export type TwilioResult = {
   from: string;
 };
 
-export async function sendSMS(body: string): Promise<TwilioResult> {
-  const sid   = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const from  = process.env.TWILIO_PHONE_NUMBER;
-  const to    = process.env.MY_PHONE_NUMBER;
+const NOTIFY_EMAIL = 'dortiz3436@gmail.com';
 
-  if (!sid || !token || !from || !to) {
-    throw new Error('Missing Twilio environment variables');
+// Send via Telegram
+async function sendTelegram(body: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_OWNER_ID;
+  if (!token || !chatId) return false;
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: body }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
+}
 
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-    {
+// Send email via Resend
+async function sendEmail(body: string): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return false;
+
+  try {
+    const firstLine = body.split('\n')[0].replace(/[^\w\s·—\-]/g, '').trim();
+    const subject = firstLine.slice(0, 60) || 'Project Rocky Alert';
+
+    const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
-        'Content-Type':  'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams({
-        To:   `whatsapp:${to}`,
-        From: `whatsapp:${from}`,
-        Body: body,
+      body: JSON.stringify({
+        from: 'Rocky <onboarding@resend.dev>',
+        to: [NOTIFY_EMAIL],
+        subject,
+        text: body,
       }),
-    }
-  );
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
-  const json = await res.json();
+// Main send function — Telegram primary, email backup
+export async function sendSMS(body: string): Promise<TwilioResult> {
+  const [telegramSent, emailSent] = await Promise.all([
+    sendTelegram(body),
+    sendEmail(body),
+  ]);
 
-  if (!res.ok) {
-    throw new Error(`Twilio ${res.status} (code ${json.code ?? '?'}): ${json.message ?? res.statusText}`);
+  if (telegramSent) {
+    return {
+      sid: 'telegram',
+      status: 'sent-via-telegram',
+      error_code: null,
+      error_message: null,
+      to: 'telegram',
+      from: 'rocky-bot',
+    };
   }
 
-  return {
-    sid:           json.sid,
-    status:        json.status,
-    error_code:    json.error_code   ?? null,
-    error_message: json.error_message ?? null,
-    to:            json.to,
-    from:          json.from,
-  };
+  if (emailSent) {
+    return {
+      sid: 'email-fallback',
+      status: 'sent-via-email',
+      error_code: null,
+      error_message: null,
+      to: NOTIFY_EMAIL,
+      from: 'rocky@resend.dev',
+    };
+  }
+
+  throw new Error('Both Telegram and email delivery failed');
 }

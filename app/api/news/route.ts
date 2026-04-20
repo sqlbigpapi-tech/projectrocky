@@ -139,13 +139,34 @@ async function fetchFeed(feed: (typeof FEEDS)[0]): Promise<NewsItem[]> {
 
 export async function GET() {
   const results = await Promise.all(FEEDS.map(fetchFeed));
-  const articles = results
-    .flat()
-    .sort((a, b) => {
-      const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-      const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-      return tb - ta;
-    });
+
+  // Balance categories — max 2 per category, then fill remaining by recency
+  const allItems = results.flat().sort((a, b) => {
+    const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    return tb - ta;
+  });
+
+  const catCount: Record<string, number> = {};
+  const balanced: NewsItem[] = [];
+  const overflow: NewsItem[] = [];
+
+  for (const item of allItems) {
+    const count = catCount[item.category] ?? 0;
+    if (count < 2) {
+      balanced.push(item);
+      catCount[item.category] = count + 1;
+    } else {
+      overflow.push(item);
+    }
+  }
+
+  // Fill remaining slots from overflow (sorted by recency)
+  const articles = [...balanced, ...overflow].sort((a, b) => {
+    const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    return tb - ta;
+  });
 
   return NextResponse.json({ articles });
 }

@@ -128,11 +128,11 @@ export default function NotificationsTab() {
     <div className="space-y-4 max-w-2xl">
 
       {/* Header */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+      <div className="rounded-2xl border border-zinc-800 bg-[var(--card)] p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono mb-1">Project Rocky</p>
-            <h2 className="text-xl font-bold text-white">WhatsApp Alerts</h2>
+            <h2 className="text-xl font-bold text-white">Telegram Alerts</h2>
             <p className="text-sm text-zinc-500 mt-1">{ALERTS.length} alerts configured · {Object.values(enabled).filter(Boolean).length} active</p>
           </div>
           <button
@@ -165,8 +165,8 @@ export default function NotificationsTab() {
               key={alert.key}
               className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
                 enabled[alert.key]
-                  ? 'bg-zinc-950 border-zinc-700'
-                  : 'bg-zinc-950/50 border-zinc-800 opacity-60'
+                  ? 'bg-[var(--card)] border-zinc-700'
+                  : 'bg-[var(--card)]/50 border-zinc-800 opacity-60'
               }`}
             >
               <span className="text-2xl shrink-0">{alert.emoji}</span>

@@ -92,7 +92,7 @@ function EquitySettings({ shares, retained, onSave }: { shares: number; retained
   const inputCls = 'bg-zinc-800 border border-zinc-700 text-white text-xs font-mono rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 w-full';
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 mb-6">
+    <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 mb-6">
       <p className="text-xs text-amber-400 font-mono font-bold uppercase tracking-widest mb-4">Equity Settings</p>
       <div className="grid grid-cols-3 gap-4">
         <div>
@@ -183,24 +183,24 @@ export default function EquityTab() {
       {/* KPI Cards */}
       {latest && (
         <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Share Price</p>
             <p className="text-3xl font-bold text-amber-400 font-mono">{fmtShare(latest.sharePrice)}</p>
             <p className="text-[10px] text-zinc-600 font-mono mt-1">
               as of {MONTHS[latest.month - 1]} {latest.isForecast ? '(fcst)' : '(actual)'}
             </p>
           </div>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Valuation</p>
             <p className="text-2xl font-bold text-white font-mono">{fmtShort(latest.valuation)}</p>
             <p className="text-[10px] text-zinc-600 font-mono mt-1">5x trailing 12 + retained</p>
           </div>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">YTD Dividend/Share</p>
             <p className="text-2xl font-bold text-emerald-400 font-mono">{fmtShare(ytdDividend)}</p>
             <p className="text-[10px] text-zinc-600 font-mono mt-1">full year est: {fmtShare(fullYearDividend)}</p>
           </div>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Trailing 12 NI</p>
             <p className={`text-2xl font-bold font-mono ${latest.trailing12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {latest.trailing12 < 0 ? '-' : ''}{fmtShort(Math.abs(latest.trailing12))}
@@ -211,7 +211,7 @@ export default function EquityTab() {
       )}
 
       {/* Share Price Chart */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 mb-8">
+      <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 mb-8">
         <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Share Price Trend</p>
         <ResponsiveContainer width="100%" height={220}>
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
@@ -220,7 +220,7 @@ export default function EquityTab() {
             <YAxis tickFormatter={v => `$${v}`} tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={55} />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={0} stroke="#52525b" />
-            <Area dataKey="Share Price" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} strokeWidth={2} dot={{ r: 3, fill: '#f59e0b' }} />
+            <Area dataKey="Share Price" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} strokeWidth={3} dot={{ r: 4, fill: '#f59e0b' }} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -240,7 +240,7 @@ export default function EquityTab() {
           </thead>
           <tbody>
             {months.map(m => (
-              <tr key={m.month} className={`border-b border-zinc-900 hover:bg-zinc-950 ${m.isForecast ? 'opacity-60' : ''}`}>
+              <tr key={m.month} className={`border-b border-zinc-900 hover:bg-[var(--card)] ${m.isForecast ? 'opacity-60' : ''}`}>
                 <td className="py-3 pr-3 text-zinc-400 font-bold">
                   {MONTHS[m.month - 1]}
                   {m.isForecast && <span className="text-zinc-700 ml-1 text-[10px]">F</span>}

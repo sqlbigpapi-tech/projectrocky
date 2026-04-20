@@ -13,10 +13,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const db = getSupabase();
-  const { title, notes, priority, due_date, category, recurrence } = await request.json();
+  const { title, notes, priority, due_date, category, recurrence, is_bill, bill_amount } = await request.json();
   const { data, error } = await db
     .from('tasks')
-    .insert({ title, notes: notes ?? '', priority: priority ?? 'Medium', due_date: due_date ?? null, category: category ?? 'Personal', recurrence: recurrence ?? null })
+    .insert({ title, notes: notes ?? '', priority: priority ?? 'Medium', due_date: due_date ?? null, category: category ?? 'Personal', recurrence: recurrence ?? null, is_bill: is_bill ?? false, bill_amount: bill_amount ?? null })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

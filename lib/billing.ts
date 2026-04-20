@@ -11,7 +11,7 @@ export interface EngagementRow {
   extended_end: string | null;
   extension_probability: number | null;
   status: string;
-  consultants: { first_name: string; last_name: string; level: string } | null;
+  consultants: { first_name: string; last_name: string; level: string; cost_rate: number | null } | null;
   clients: { name: string } | null;
 }
 
@@ -25,9 +25,29 @@ export interface MonthlyBilling {
   status: string;
   probability: number;
   sowEnd: string;
-  months: Record<number, { workingDays: number; billing: number }>;
+  months: Record<number, { workingDays: number; billing: number; cost: number; margin: number }>;
   annualTotal: number;
+  annualCost: number;
+  annualMargin: number;
   engagementId: string;
+}
+
+// Comp model by level
+const COMP_MODEL: Record<string, { type: 'salary' | 'pct' | 'flat'; salary?: number; pct?: number }> = {
+  'Consultant':         { type: 'salary', salary: 155000 },
+  'Senior Consultant':  { type: 'pct', pct: 0.60 },
+  'Principal':          { type: 'pct', pct: 0.65 },
+  'Managing Principal': { type: 'pct', pct: 0.65 },
+  'Associate':          { type: 'flat' }, // uses cost_rate from DB
+};
+
+function monthlyCost(level: string, billing: number, costRate: number, workingDays: number): number {
+  const model = COMP_MODEL[level];
+  if (!model) return 0;
+  if (model.type === 'pct') return Math.round(billing * (model.pct ?? 0));
+  if (model.type === 'salary') return Math.round((model.salary ?? 0) / 12);
+  if (model.type === 'flat') return Math.round(workingDays * 8 * costRate); // flat hourly
+  return 0;
 }
 
 function workingDaysInRange(
@@ -61,7 +81,7 @@ export async function getForecast(year: number, includeAll = false): Promise<Mon
     .select(`
       id, consultant_id, client_id, deal_name, rate,
       sow_start, sow_end, extended_end, extension_probability, status,
-      consultants (first_name, last_name, level),
+      consultants (first_name, last_name, level, cost_rate),
       clients (name)
     `);
   if (!includeAll) engQuery = engQuery.neq('status', 'closed');
@@ -91,17 +111,19 @@ export async function getForecast(year: number, includeAll = false): Promise<Mon
   }
 
   const results = engagements.map(eng => {
-    const consultant = eng.consultants as unknown as { first_name: string; last_name: string; level: string };
+    const consultant = eng.consultants as unknown as { first_name: string; last_name: string; level: string; cost_rate: number | null };
     const client = eng.clients as unknown as { name: string } | null;
     const probability = eng.status === 'extension' ? (eng.extension_probability ?? 1) : 1;
     const effectiveEnd = eng.status === 'extension' && eng.extended_end ? eng.extended_end : eng.sow_end;
+    const costRate = consultant?.cost_rate ?? 0;
 
     // Build combined holiday set for this consultant
     const personalHols = consultantHolidays[eng.consultant_id] ?? new Set<string>();
     const allHolidays = new Set([...publicHolidays, ...personalHols]);
 
-    const months: Record<number, { workingDays: number; billing: number }> = {};
+    const months: Record<number, { workingDays: number; billing: number; cost: number; margin: number }> = {};
     let annualTotal = 0;
+    let annualCost = 0;
 
     for (let m = 1; m <= 12; m++) {
       const monthStart = new Date(year, m - 1, 1);
@@ -111,7 +133,7 @@ export async function getForecast(year: number, includeAll = false): Promise<Mon
 
       // Engagement must overlap this month
       if (sowStart > monthEnd || sowEnd < monthStart) {
-        months[m] = { workingDays: 0, billing: 0 };
+        months[m] = { workingDays: 0, billing: 0, cost: 0, margin: 0 };
         continue;
       }
 
@@ -119,9 +141,12 @@ export async function getForecast(year: number, includeAll = false): Promise<Mon
       const rangeEnd = sowEnd < monthEnd ? sowEnd : monthEnd;
       const workingDays = workingDaysInRange(rangeStart, rangeEnd, allHolidays);
       const billing = Math.round(workingDays * 8 * eng.rate * probability);
+      const cost = monthlyCost(consultant?.level ?? '', billing, costRate, workingDays);
+      const margin = billing - cost;
 
-      months[m] = { workingDays, billing };
+      months[m] = { workingDays, billing, cost, margin };
       annualTotal += billing;
+      annualCost += cost;
     }
 
     return {
@@ -136,6 +161,8 @@ export async function getForecast(year: number, includeAll = false): Promise<Mon
       sowEnd: effectiveEnd,
       months,
       annualTotal,
+      annualCost,
+      annualMargin: annualTotal - annualCost,
       engagementId: eng.id,
     };
   });

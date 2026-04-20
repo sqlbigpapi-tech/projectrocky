@@ -96,7 +96,7 @@ function WorksheetUpload({ onDone }: { onDone: () => void }) {
     setUploading(false);
   }
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 mb-6">
+    <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 mb-6">
       <p className="text-xs text-amber-400 font-mono font-bold uppercase tracking-widest mb-3">Upload Monthly Worksheet</p>
       <p className="text-xs text-zinc-500 font-mono mb-4">Drop an xlsx to update actuals (Revenue, SGA, Cons Labor, Net Income, Stock Purchases)</p>
       <div onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-amber-500'); }}
@@ -170,7 +170,7 @@ function ScenarioPanel({ scenarios, onChange }: { scenarios: ScenarioAdj[]; onCh
   const totalNiDelta = niDeltas.reduce((s, d) => s + d, 0);
 
   return (
-    <div className="bg-zinc-950 border border-amber-500/30 rounded-xl p-5 mb-6">
+    <div className="bg-[var(--card)] border border-amber-500/30 rounded-xl p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-amber-400 font-mono font-bold uppercase tracking-widest">Scenario Builder</p>
         {scenarios.length > 0 && (
@@ -355,7 +355,7 @@ export default function FinancialModelTab() {
           { label: 'YTD Expenses', value: ytdExpenses > 0 ? fmtShort(ytdExpenses) : '—', color: 'text-zinc-300' },
           { label: 'Net Margin', value: ytdMargin ? `${ytdMargin}%` : '—', color: 'text-amber-400' },
         ].map(k => (
-          <div key={k.label} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+          <div key={k.label} className="bg-[var(--card)] border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">{k.label}</p>
             <p className={`text-2xl font-bold font-mono ${k.color}`}>{k.value}</p>
           </div>
@@ -364,7 +364,7 @@ export default function FinancialModelTab() {
 
       {/* Chart */}
       {!loading && months.length > 0 && (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-5 mb-8">
+        <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 mb-8">
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -375,11 +375,11 @@ export default function FinancialModelTab() {
               <ReferenceLine y={0} stroke="#52525b" strokeWidth={1} />
               <Bar dataKey="Revenue" fill="#10b981" fillOpacity={hasScenario ? 0.3 : 0.7} radius={[3,3,0,0]} />
               <Bar dataKey="Expenses" fill="#f43f5e" fillOpacity={0.6} radius={[3,3,0,0]} />
-              <Line dataKey="Net Income" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: '#f59e0b' }} />
+              <Line dataKey="Net Income" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b' }} />
               {hasScenario && (
                 <>
                   <Bar dataKey="Scenario Revenue" fill="#10b981" fillOpacity={0.7} radius={[3,3,0,0]} />
-                  <Line dataKey="Scenario NI" stroke="#818cf8" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3, fill: '#818cf8' }} />
+                  <Line dataKey="Scenario NI" stroke="#818cf8" strokeWidth={3} strokeDasharray="6 3" dot={{ r: 4, fill: '#818cf8' }} />
                 </>
               )}
             </ComposedChart>
@@ -415,7 +415,7 @@ export default function FinancialModelTab() {
                 const scenRev = m.revenue + revDelta;
                 const scenNI = m.net_income + niDelta;
                 return (
-                  <tr key={m.month} className="border-b border-zinc-900 hover:bg-zinc-950 group">
+                  <tr key={m.month} className="border-b border-zinc-900 hover:bg-[var(--card)] group">
                     <td className="py-3 pr-4 text-zinc-400 font-bold">{MONTHS[m.month - 1]}</td>
                     <td className="py-3 pr-4 text-emerald-400">
                       <EditableCell value={m.revenue} onSave={v => updateField(m, 'revenue', v)} />
