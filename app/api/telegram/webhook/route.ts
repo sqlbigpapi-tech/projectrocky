@@ -1,10 +1,18 @@
-import { generateText, stepCountIs, experimental_transcribe as transcribe } from 'ai';
+import {
+  generateText,
+  stepCountIs,
+  experimental_transcribe as transcribe,
+  type ModelMessage,
+} from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
+import { getSupabase } from '@/lib/supabase';
 import { makeRockyTools, ROCKY_PERSONALITY } from '@/lib/rocky-tools';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const OWNER_ID = process.env.TELEGRAM_OWNER_ID!;
+const HISTORY_LIMIT = 20; // messages to keep in context per chat
+const HISTORY_TTL_HOURS = 24; // discard anything older than this
 
 async function sendTelegram(chatId: string | number, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -38,6 +46,32 @@ async function transcribeVoice(audio: Uint8Array): Promise<string | null> {
   }
 }
 
+async function loadHistory(chatId: string): Promise<ModelMessage[]> {
+  const db = getSupabase();
+  const cutoff = new Date(Date.now() - HISTORY_TTL_HOURS * 3600 * 1000).toISOString();
+  const { data } = await db.from('rocky_messages')
+    .select('role, content')
+    .eq('chat_id', chatId)
+    .gte('created_at', cutoff)
+    .order('created_at', { ascending: false })
+    .limit(HISTORY_LIMIT);
+  if (!data) return [];
+  return data.reverse().map(r => ({ role: r.role, content: r.content } as ModelMessage));
+}
+
+async function saveMessages(chatId: string, messages: ModelMessage[]) {
+  if (messages.length === 0) return;
+  const db = getSupabase();
+  await db.from('rocky_messages').insert(
+    messages.map(m => ({ chat_id: chatId, role: m.role, content: m.content })),
+  );
+}
+
+async function clearHistory(chatId: string) {
+  const db = getSupabase();
+  await db.from('rocky_messages').delete().eq('chat_id', chatId);
+}
+
 export async function POST(request: Request) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET?.replace(/^["']|["']$/g, '').trim();
   const actual = request.headers.get('x-telegram-bot-api-secret-token');
@@ -49,7 +83,7 @@ export async function POST(request: Request) {
   const message = update.message;
   if (!message) return NextResponse.json({ ok: true });
 
-  const chatId = message.chat.id;
+  const chatId = String(message.chat.id);
   const userId = String(message.from.id);
 
   if (userId !== OWNER_ID) {
@@ -79,12 +113,18 @@ export async function POST(request: Request) {
   if (!body) return NextResponse.json({ ok: true });
 
   if (body === '/start') {
-    await sendTelegram(chatId, '🥊 *Project Rocky* is online.\n\nTalk to me naturally — text or voice:\n• "Add a task to call Charlie by Friday"\n• "What did I spend on dining in March?"\n• "How did I sleep last night?"\n• "What\'s my net worth?"\n• "What meetings do I have today?"\n\nOr type /help for all commands.');
+    await sendTelegram(chatId, '🥊 *Project Rocky* is online.\n\nTalk to me naturally — text or voice:\n• "Add a task to call Charlie by Friday"\n• "What did I spend on dining in March?"\n• "How did I sleep last night?"\n• "What\'s my net worth?"\n• "What meetings do I have today?"\n\nI remember our recent conversation, so follow-ups like "mark the third one done" just work. Type /forget to reset.\n\nType /help for more.');
     return NextResponse.json({ ok: true });
   }
 
   if (body === '/help') {
-    await sendTelegram(chatId, '*Rocky Commands:*\n\nText or voice, just talk naturally:\n• "Add a task to call Charlie by Friday"\n• "Mark the Cummins task as done"\n• "What did I spend on dining this month?"\n• "Show me every Amazon charge last week"\n• "How has my net worth changed this year?"\n• "How did I sleep last night?"\n• "What meetings do I have today?"\n• Any financial question');
+    await sendTelegram(chatId, '*Rocky Commands:*\n\nText or voice, just talk naturally:\n• "Add a task to call Charlie by Friday"\n• "Mark the Cummins task as done"\n• "What did I spend on dining this month?"\n• "Show me every Amazon charge last week"\n• "How has my net worth changed this year?"\n• "How did I sleep last night?"\n• "What meetings do I have today?"\n• Any financial question\n\n/forget — wipe our conversation history');
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body === '/forget') {
+    await clearHistory(chatId);
+    await sendTelegram(chatId, 'Cleared. Starting fresh.');
     return NextResponse.json({ ok: true });
   }
 
@@ -93,16 +133,22 @@ export async function POST(request: Request) {
   const todayStr = `${eastern.getFullYear()}-${String(eastern.getMonth() + 1).padStart(2, '0')}-${String(eastern.getDate()).padStart(2, '0')}`;
 
   try {
-    const { text } = await generateText({
+    const history = await loadHistory(chatId);
+    const userMessage: ModelMessage = { role: 'user', content: body };
+    const messages: ModelMessage[] = [...history, userMessage];
+
+    const result = await generateText({
       model: 'anthropic/claude-sonnet-4.6',
       maxOutputTokens: 800,
       tools: makeRockyTools(base),
       stopWhen: stepCountIs(5),
       system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.${viaVoice ? ' This message came in as a voice memo that was transcribed — allow for transcription quirks and use conversational phrasing in the reply.' : ''}`,
-      prompt: body,
+      messages,
     });
 
-    const reply = text.trim() || '…';
+    await saveMessages(chatId, [userMessage, ...result.response.messages]);
+
+    const reply = result.text.trim() || '…';
     await sendTelegram(chatId, reply.slice(0, 4000));
   } catch (err) {
     console.error('Rocky error:', err);
