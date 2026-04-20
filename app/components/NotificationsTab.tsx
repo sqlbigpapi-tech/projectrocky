@@ -109,13 +109,9 @@ export default function NotificationsTab() {
     setTestStatus('sending');
     setTestError('');
     try {
-      const res = await fetch('/api/sms/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: '👋 Rocky is online. SMS notifications are working.' }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? 'Unknown error');
+      const res = await fetch('/api/telegram/test', { method: 'POST' });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
       setTestStatus('sent');
       setTimeout(() => setTestStatus('idle'), 4000);
     } catch (e: any) {
