@@ -96,16 +96,12 @@ function LiveClock() {
   }
 
   return (
-    <div className="text-center space-y-1.5">
-      <p className="text-[10px] text-zinc-700 font-mono">Parkland, FL</p>
+    <div className="text-center">
       <p className="text-[11px] text-zinc-500 font-mono tabular-nums">
-        {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
-      </p>
-      <p className="text-[9px] text-zinc-700 font-mono">
-        {now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+        {now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
       </p>
       {nextMeeting && countdown && (
-        <div className="pt-1.5 mt-1.5 border-t border-[var(--border)]/60">
+        <div className="mt-1">
           <p className="text-[9px] text-zinc-600 font-mono truncate px-1" title={nextMeeting.summary}>
             {nextMeeting.summary.length > 18 ? nextMeeting.summary.slice(0, 17) + '…' : nextMeeting.summary}
           </p>
@@ -274,17 +270,19 @@ export default function Home() {
     }
   }
 
-  const ALL_MAIN_TABS: { key: MainTab; label: string; access: ('owner' | 'manager' | 'team')[] }[] = [
-    { key: 'briefing', label: 'Briefing', access: ['owner'] },
-    { key: 'sports', label: 'Sports', access: ['owner'] },
-    { key: 'tasks', label: 'Tasks', access: ['owner'] },
-    { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'] },
-    { key: 'personal', label: 'Finance', access: ['owner'] },
-    { key: 'health', label: 'Health', access: ['owner'] },
-    { key: 'notifications', label: 'Alerts', access: ['owner'] },
-    { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'] },
+  const ALL_MAIN_TABS: { key: MainTab; label: string; access: ('owner' | 'manager' | 'team')[]; section: 'primary' | 'admin' }[] = [
+    { key: 'briefing', label: 'Briefing', access: ['owner'], section: 'primary' },
+    { key: 'sports', label: 'Sports', access: ['owner'], section: 'primary' },
+    { key: 'tasks', label: 'Tasks', access: ['owner'], section: 'primary' },
+    { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'], section: 'primary' },
+    { key: 'personal', label: 'Finance', access: ['owner'], section: 'primary' },
+    { key: 'health', label: 'Health', access: ['owner'], section: 'primary' },
+    { key: 'notifications', label: 'Alerts', access: ['owner'], section: 'admin' },
+    { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'], section: 'admin' },
   ];
   const MAIN_TABS = ALL_MAIN_TABS.filter(t => t.access.includes(role as any));
+  const PRIMARY_TABS = MAIN_TABS.filter(t => t.section === 'primary');
+  const ADMIN_TABS = MAIN_TABS.filter(t => t.section === 'admin');
 
   useEffect(() => {
     if (isTeam && tab !== 'finance') setTab('finance');
@@ -414,8 +412,8 @@ export default function Home() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2.5">
-          {MAIN_TABS.map((t, i) => {
+        <nav className="flex-1 overflow-y-auto py-2 px-2.5">
+          {PRIMARY_TABS.map((t, i) => {
             const Icon = TAB_ICONS[t.key];
             const active = tab === t.key;
             const isFinance = t.key === 'finance';
@@ -423,26 +421,26 @@ export default function Home() {
               <div key={t.key}>
                 <button
                   onClick={() => selectTab(t.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 group ${
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
                     active
                       ? 'bg-amber-500/10 text-amber-400'
                       : 'text-zinc-500 hover:text-zinc-200 hover:bg-[var(--card)]/60'
                   }`}
                 >
-                  <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors duration-150 ${active ? 'text-amber-400' : 'text-zinc-600 group-hover:text-zinc-400'}`} />
+                  <Icon className={`w-[16px] h-[16px] shrink-0 transition-colors duration-150 ${active ? 'text-amber-400' : 'text-zinc-600 group-hover:text-zinc-400'}`} />
                   <span className="flex-1 text-left">{t.label}</span>
-                  <span className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded transition-opacity duration-150 ${active ? 'bg-amber-500/20 text-amber-400/70' : 'bg-[var(--card)] text-zinc-700 opacity-0 group-hover:opacity-100'}`}>{i + 1}</span>
-                  {(isFinance || t.key === 'personal') && <IconChevron className="w-3.5 h-3.5 text-zinc-600" open={isFinance ? financeOpen : personalOpen} />}
+                  <span className={`text-[10px] font-mono tabular-nums px-1.5 rounded transition-opacity duration-150 ${active ? 'bg-amber-500/20 text-amber-400/70' : 'bg-[var(--card)] text-zinc-700 opacity-0 group-hover:opacity-100'}`}>{i + 1}</span>
+                  {(isFinance || t.key === 'personal') && <IconChevron className="w-3 h-3 text-zinc-600" open={isFinance ? financeOpen : personalOpen} />}
                 </button>
 
                 {/* Finance sub-items */}
                 {isFinance && financeOpen && (
-                  <div className="ml-[30px] mt-0.5 mb-1 border-l border-[var(--border)] pl-3 space-y-0.5">
+                  <div className="ml-[26px] mt-0.5 mb-1 border-l border-[var(--border)] pl-2.5 space-y-0.5">
                     {FINANCE_SUBS.map((s, si) => (
                       <button
                         key={s.key}
                         onClick={() => { setTab('finance'); setFinanceTab(s.key); }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all duration-150 group/sub ${
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-xs font-mono transition-all duration-150 group/sub ${
                           tab === 'finance' && financeTab === s.key
                             ? 'text-emerald-400 bg-emerald-500/10'
                             : 'text-zinc-600 hover:text-zinc-300 hover:bg-[var(--card)]/40'
@@ -459,12 +457,12 @@ export default function Home() {
 
                 {/* Personal sub-items */}
                 {t.key === 'personal' && personalOpen && (
-                  <div className="ml-[30px] mt-0.5 mb-1 border-l border-[var(--border)] pl-3 space-y-0.5">
+                  <div className="ml-[26px] mt-0.5 mb-1 border-l border-[var(--border)] pl-2.5 space-y-0.5">
                     {PERSONAL_SUBS.map((s, si) => (
                       <button
                         key={s.key}
                         onClick={() => { setTab('personal'); setPersonalTab(s.key); }}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all duration-150 group/sub ${
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-md text-xs font-mono transition-all duration-150 group/sub ${
                           tab === 'personal' && personalTab === s.key
                             ? 'text-violet-400 bg-violet-500/10'
                             : 'text-zinc-600 hover:text-zinc-300 hover:bg-[var(--card)]/40'
@@ -485,12 +483,12 @@ export default function Home() {
 
         {/* Ask Rocky — owner only */}
         {role === 'owner' && (
-          <div className="px-2.5 pb-2">
+          <div className="px-2.5 pb-1.5">
             <button
               onClick={() => setRockyOpen(true)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/20 text-amber-400 hover:from-amber-500/20 hover:to-amber-600/10 transition-all duration-150"
+              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/20 text-amber-400 hover:from-amber-500/20 hover:to-amber-600/10 transition-all duration-150"
             >
-              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0">
+              <div className="w-4 h-4 rounded bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shrink-0">
                 <span className="text-black font-bold text-[9px] font-mono">R</span>
               </div>
               Ask Rocky
@@ -498,13 +496,35 @@ export default function Home() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="px-4 py-4 border-t border-[var(--border)]/60 space-y-2">
+        {/* Admin group — Alerts + Guide */}
+        {ADMIN_TABS.length > 0 && (
+          <div className="px-2.5 pb-2 border-t border-[var(--border)]/40 pt-2">
+            {ADMIN_TABS.map(t => {
+              const active = tab === t.key;
+              const Icon = TAB_ICONS[t.key];
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => selectTab(t.key)}
+                  className={`w-full flex items-center gap-2 px-3 py-1 rounded-md text-[11px] font-mono transition-colors duration-150 ${
+                    active ? 'text-amber-400 bg-amber-500/10' : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                >
+                  <Icon className={`w-3 h-3 shrink-0 ${active ? 'text-amber-400' : 'text-zinc-700'}`} />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Footer — time + logout */}
+        <div className="px-4 py-2.5 border-t border-[var(--border)]/60">
           <LiveClock />
-          <div className="flex justify-center">
+          <div className="flex justify-center mt-1.5">
             <button
               onClick={() => { document.cookie = 'session=; path=/; max-age=0'; document.cookie = 'role=; path=/; max-age=0'; window.location.href = '/login'; }}
-              className="text-[10px] text-zinc-700 font-mono hover:text-red-400 transition"
+              className="text-[9px] text-zinc-700 font-mono hover:text-red-400 transition"
             >
               logout
             </button>
