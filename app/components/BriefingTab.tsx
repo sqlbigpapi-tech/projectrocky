@@ -66,8 +66,10 @@ type NavTab = 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'ne
 type EquitySummary = { sharePrice: number; valuation: number; trailing12: number; month: number; isForecast: boolean };
 type EndingSoonItem = { consultantName: string; client: string; sowEnd: string; annualTotal: number };
 type CalEvent = { summary: string; start: string; end: string; location: string; isAllDay: boolean };
+type TimeOfDay = 'morning' | 'midday' | 'afternoon' | 'evening' | 'late';
 
 export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab) => void }) {
+  const [briefing, setBriefing] = useState<{ summary: string; timeOfDay: TimeOfDay } | null>(null);
   const [weather, setWeather] = useState<WeatherCurrent | null>(null);
   const [calEvents, setCalEvents] = useState<CalEvent[]>([]);
   const [followedTeams, setFollowedTeams] = useState<FollowedTeam[]>(DEFAULT_TEAMS);
@@ -129,6 +131,7 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
 
     safe(fetch('/api/news')).then(d => { if (d?.articles) setNews(d.articles); });
     safe(fetch('/api/net-worth')).then(d => { if (d?.snapshots) setNetWorthSnaps(d.snapshots); });
+    safe(fetch('/api/briefing')).then(d => { if (d?.summary && d?.timeOfDay) setBriefing({ summary: d.summary, timeOfDay: d.timeOfDay }); });
 
     // Fetch team feeds for smart greeting context
     for (const t of followedTeams) {
@@ -270,11 +273,15 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
 
       {/* ── Tier 1: Compact Hero ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[var(--border)]/60">
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
             {greeting}, {typeof document !== 'undefined' ? (document.cookie.match(/(?:^|; )user_name=([^;]*)/)?.[1] ?? 'David') : 'David'}.
           </h2>
-          {smartContext && <p className="text-sm text-zinc-400 mt-0.5">{smartContext}</p>}
+          {briefing ? (
+            <p className="text-sm text-zinc-300 mt-1 leading-relaxed">{briefing.summary}</p>
+          ) : (
+            smartContext && <p className="text-sm text-zinc-400 mt-0.5">{smartContext}</p>
+          )}
         </div>
         <div className="flex items-center gap-4 shrink-0">
           {weather && (
@@ -354,7 +361,9 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
           )}
 
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Tasks</p>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">
+              {briefing?.timeOfDay === 'evening' || briefing?.timeOfDay === 'late' ? 'Next Up' : 'Tasks'}
+            </p>
             <button onClick={() => onNavigate?.('tasks')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">{openTasks.length} open →</button>
           </div>
           {upcomingTasks.length === 0 ? (
