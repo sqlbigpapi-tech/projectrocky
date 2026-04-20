@@ -1,4 +1,5 @@
-import { generateText, stepCountIs } from 'ai';
+import { generateText, stepCountIs, experimental_transcribe as transcribe } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
 import { makeRockyTools, ROCKY_PERSONALITY } from '@/lib/rocky-tools';
 
@@ -13,6 +14,30 @@ async function sendTelegram(chatId: string | number, text: string) {
   });
 }
 
+async function downloadTelegramFile(fileId: string): Promise<Uint8Array | null> {
+  const metaRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+  if (!metaRes.ok) return null;
+  const meta = await metaRes.json() as { ok: boolean; result?: { file_path?: string } };
+  const path = meta.result?.file_path;
+  if (!path) return null;
+  const fileRes = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${path}`);
+  if (!fileRes.ok) return null;
+  return new Uint8Array(await fileRes.arrayBuffer());
+}
+
+async function transcribeVoice(audio: Uint8Array): Promise<string | null> {
+  try {
+    const result = await transcribe({
+      model: openai.transcription('whisper-1'),
+      audio,
+    });
+    return result.text?.trim() || null;
+  } catch (err) {
+    console.error('Transcription failed:', err);
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET?.replace(/^["']|["']$/g, '').trim();
   const actual = request.headers.get('x-telegram-bot-api-secret-token');
@@ -22,24 +47,44 @@ export async function POST(request: Request) {
 
   const update = await request.json();
   const message = update.message;
-  if (!message?.text) return NextResponse.json({ ok: true });
+  if (!message) return NextResponse.json({ ok: true });
 
   const chatId = message.chat.id;
   const userId = String(message.from.id);
-  const body = message.text.trim();
 
   if (userId !== OWNER_ID) {
     await sendTelegram(chatId, 'Unknown user.');
     return NextResponse.json({ ok: true });
   }
 
+  let body = message.text?.trim();
+  let viaVoice = false;
+
+  if (!body && (message.voice || message.audio)) {
+    const fileId = (message.voice ?? message.audio).file_id;
+    const audio = await downloadTelegramFile(fileId);
+    if (!audio) {
+      await sendTelegram(chatId, 'Couldn\'t fetch that voice message. Try again or type it.');
+      return NextResponse.json({ ok: true });
+    }
+    const transcript = await transcribeVoice(audio);
+    if (!transcript) {
+      await sendTelegram(chatId, 'Couldn\'t transcribe that voice message.');
+      return NextResponse.json({ ok: true });
+    }
+    body = transcript;
+    viaVoice = true;
+  }
+
+  if (!body) return NextResponse.json({ ok: true });
+
   if (body === '/start') {
-    await sendTelegram(chatId, '🥊 *Project Rocky* is online.\n\nJust talk to me naturally:\n• "Add a task to call Charlie by Friday"\n• "What are my tasks this week?"\n• "What\'s my net worth?"\n• "What meetings do I have today?"\n• "How am I doing financially?"\n\nOr type /help for all commands.');
+    await sendTelegram(chatId, '🥊 *Project Rocky* is online.\n\nTalk to me naturally — text or voice:\n• "Add a task to call Charlie by Friday"\n• "What did I spend on dining in March?"\n• "How did I sleep last night?"\n• "What\'s my net worth?"\n• "What meetings do I have today?"\n\nOr type /help for all commands.');
     return NextResponse.json({ ok: true });
   }
 
   if (body === '/help') {
-    await sendTelegram(chatId, '*Rocky Commands:*\n\nJust talk naturally — I figure out what you need:\n• "Add a task to call Charlie by Friday"\n• "Mark the Cummins task as done"\n• "What are my tasks?"\n• "Update share price to 425"\n• "Update mercedes mileage to 21000"\n• "What\'s my net worth?"\n• "What meetings do I have today?"\n• Any financial question');
+    await sendTelegram(chatId, '*Rocky Commands:*\n\nText or voice, just talk naturally:\n• "Add a task to call Charlie by Friday"\n• "Mark the Cummins task as done"\n• "What did I spend on dining this month?"\n• "Show me every Amazon charge last week"\n• "How has my net worth changed this year?"\n• "How did I sleep last night?"\n• "What meetings do I have today?"\n• Any financial question');
     return NextResponse.json({ ok: true });
   }
 
@@ -53,7 +98,7 @@ export async function POST(request: Request) {
       maxOutputTokens: 800,
       tools: makeRockyTools(base),
       stopWhen: stepCountIs(5),
-      system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.`,
+      system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.${viaVoice ? ' This message came in as a voice memo that was transcribed — allow for transcription quirks and use conversational phrasing in the reply.' : ''}`,
       prompt: body,
     });
 
