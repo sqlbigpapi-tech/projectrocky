@@ -135,14 +135,20 @@ export async function POST(request: Request) {
   try {
     const history = await loadHistory(chatId);
     const userMessage: ModelMessage = { role: 'user', content: body };
-    const messages: ModelMessage[] = [...history, userMessage];
+    const systemMessage: ModelMessage = {
+      role: 'system',
+      content: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.${viaVoice ? ' This message came in as a voice memo that was transcribed — allow for transcription quirks and use conversational phrasing in the reply.' : ''}`,
+      providerOptions: {
+        anthropic: { cacheControl: { type: 'ephemeral' } },
+      },
+    };
+    const messages: ModelMessage[] = [systemMessage, ...history, userMessage];
 
     const result = await generateText({
       model: 'anthropic/claude-sonnet-4.6',
       maxOutputTokens: 800,
       tools: makeRockyTools(base),
       stopWhen: stepCountIs(5),
-      system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.${viaVoice ? ' This message came in as a voice memo that was transcribed — allow for transcription quirks and use conversational phrasing in the reply.' : ''}`,
       messages,
     });
 
