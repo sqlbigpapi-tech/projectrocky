@@ -46,6 +46,11 @@ async function transcribeVoice(audio: Uint8Array): Promise<string | null> {
   }
 }
 
+function hasToolCall(content: unknown): boolean {
+  return Array.isArray(content)
+    && content.some(p => p && typeof p === 'object' && (p as { type?: string }).type === 'tool-call');
+}
+
 async function loadHistory(chatId: string): Promise<ModelMessage[]> {
   const db = getSupabase();
   const cutoff = new Date(Date.now() - HISTORY_TTL_HOURS * 3600 * 1000).toISOString();
@@ -57,11 +62,18 @@ async function loadHistory(chatId: string): Promise<ModelMessage[]> {
     .limit(HISTORY_FETCH);
   if (!data) return [];
   const asc = data.reverse();
-  // Trim orphaned assistant/tool messages at the start so history starts at a user-turn boundary.
-  // Without this, the LLM sees a tool-result with no matching tool-call and rejects the request.
+  // Trim the head to a user-turn boundary and the tail to a clean assistant reply.
+  // Anthropic rejects any tool-call without a matching tool-result (and vice versa),
+  // so history must not start or end mid-tool-sequence.
   const firstUser = asc.findIndex(r => r.role === 'user');
   if (firstUser === -1) return [];
-  return asc.slice(firstUser).map(r => ({ role: r.role, content: r.content } as ModelMessage));
+  const trimmed = asc.slice(firstUser);
+  while (trimmed.length > 0) {
+    const last = trimmed[trimmed.length - 1];
+    if (last.role === 'assistant' && !hasToolCall(last.content)) break;
+    trimmed.pop();
+  }
+  return trimmed.map(r => ({ role: r.role, content: r.content } as ModelMessage));
 }
 
 async function saveMessages(chatId: string, messages: ModelMessage[]) {
@@ -146,10 +158,18 @@ export async function POST(request: Request) {
       model: 'anthropic/claude-sonnet-4.6',
       maxOutputTokens: 800,
       tools: makeRockyTools(base),
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       system: `${ROCKY_PERSONALITY}\n\nContext: Today is ${todayStr} (America/New_York). You are responding in a Telegram chat with David.${viaVoice ? ' This message came in as a voice memo that was transcribed — allow for transcription quirks and use conversational phrasing in the reply.' : ''}`,
       messages,
     });
+
+    // If we hit the step cap mid-tool-chain, the final assistant message is an
+    // unresolved tool-call. Persisting it would poison the next turn — drop the
+    // whole exchange instead.
+    if (result.finishReason === 'tool-calls') {
+      await sendTelegram(chatId, 'I got tangled up mid-thought. Try rephrasing?');
+      return NextResponse.json({ ok: true });
+    }
 
     await saveMessages(chatId, [userMessage, ...result.response.messages]);
 
