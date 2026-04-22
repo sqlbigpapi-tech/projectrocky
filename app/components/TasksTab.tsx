@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useToast } from '../page';
 
 type Priority = 'High' | 'Medium' | 'Low';
 type Category = 'Business' | 'Personal';
@@ -470,6 +471,7 @@ export default function TasksTab() {
   const [categoryFilter, setCategoryFilter] = useState<Category | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [showCompleted, setShowCompleted] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetch('/api/tasks')
@@ -491,6 +493,7 @@ export default function TasksTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, ...recurPatch }),
       });
+      toast(`↻ ${task.title} — rolled to tomorrow`, 'success');
       return;
     }
     if (patch.completed === true && task?.recurrence === 'monthly') {
@@ -504,6 +507,8 @@ export default function TasksTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, ...recurPatch }),
       });
+      const nextLabel = new Date(due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      toast(`↻ ${task.title} — next on ${nextLabel}`, 'success');
       return;
     }
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
@@ -512,6 +517,7 @@ export default function TasksTab() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...patch }),
     });
+    if (patch.completed === true && task) toast(`Completed: ${task.title}`, 'success');
   }
 
   async function handleDelete(id: string) {
