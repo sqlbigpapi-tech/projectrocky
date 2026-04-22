@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { SportsSkeleton } from './Skeletons';
+import GameCenter from './GameCenter';
 
 type FollowedTeam = { sport: string; league: string; teamId: string };
 
 type GameInfo = {
+  id: string;
   date: string;
   opponent: string;
   opponentAbbr: string;
@@ -28,9 +30,12 @@ type TeamFeed = {
   liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
+  last5: ('W' | 'L')[];
   news: NewsItem[];
   standings: Standings | null;
 };
+
+type GameCenterTarget = { sport: string; league: string; eventId: string } | null;
 
 function hexColor(c: string | null | undefined): string | null {
   if (!c) return null;
@@ -80,7 +85,26 @@ function formatGameTime(dateStr: string) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading: boolean; onRemove: () => void }) {
+function FormPips({ last5 }: { last5: ('W' | 'L')[] }) {
+  if (!last5 || last5.length === 0) return null;
+  return (
+    <span className="flex items-center gap-0.5" title={`Last ${last5.length}: ${last5.join(' ')}`}>
+      {last5.map((r, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full ${r === 'W' ? 'bg-emerald-400' : 'bg-red-400/70'}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function TeamCard({ feed, loading, onRemove, onOpenGame }: {
+  feed: TeamFeed | null;
+  loading: boolean;
+  onRemove: () => void;
+  onOpenGame: (target: GameCenterTarget) => void;
+}) {
   const [newsExpanded, setNewsExpanded] = useState(false);
 
   if (loading) {
@@ -95,43 +119,71 @@ function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading:
     );
   }
 
-  const { team, liveGame, lastGame, nextGame, news, standings } = feed;
+  const { team, liveGame, lastGame, nextGame, last5, news, standings } = feed;
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
   const accent = hexColor(team.color) ?? hexColor(team.altColor);
+
+  // Derive sport/league back from league label for Gamecenter calls
+  const leagueLower = team.league.toLowerCase();
+  const sportForLeague =
+    leagueLower === 'nfl' || leagueLower === 'ncaaf' ? 'football'
+      : leagueLower === 'nba' ? 'basketball'
+      : leagueLower === 'mlb' ? 'baseball'
+      : 'football';
+  const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
+
+  const openGame = (g: GameInfo | null) => {
+    if (!g?.id) return;
+    onOpenGame({ sport: sportForLeague, league: apiLeague, eventId: g.id });
+  };
 
   return (
     <div
       className="bg-[var(--card)] border border-zinc-800 border-l-4 rounded-xl overflow-hidden"
       style={accent ? { borderLeftColor: accent } : undefined}
     >
-      {/* Team header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-        <div className="flex items-center gap-3">
+      {/* Team header — gradient with oversized logo */}
+      <div
+        className="relative px-5 py-5 border-b border-zinc-800"
+        style={
+          accent
+            ? { background: `linear-gradient(135deg, ${accent}33 0%, ${accent}0D 40%, transparent 100%)` }
+            : undefined
+        }
+      >
+        <button
+          onClick={onRemove}
+          className="absolute top-3 right-4 text-zinc-700 hover:text-red-400 text-xs transition"
+        >
+          ✕
+        </button>
+        <div className="flex items-center gap-4">
           {team.logo && (
-            <div className="w-9 h-9 relative shrink-0">
+            <div className="w-16 h-16 relative shrink-0 drop-shadow-lg">
               <Image src={team.logo} alt={team.abbr} fill className="object-contain" unoptimized />
             </div>
           )}
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-white">{team.name}</p>
-              {team.record && (
-                <span className="text-xs text-zinc-500 font-mono tabular-nums">{team.record}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-base font-bold text-white leading-tight">{team.name}</p>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border font-mono ${leagueColor}`}>
                 {team.league}
               </span>
+            </div>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {team.record && (
+                <span className="text-sm font-mono tabular-nums text-zinc-300 font-bold">{team.record}</span>
+              )}
+              <FormPips last5={last5 ?? []} />
               {standings && (
-                <span className="text-xs text-zinc-500 font-mono">
+                <span className="text-[11px] text-zinc-500 font-mono">
                   {standings.divisionGB === '-' ? (
-                    <span className="text-emerald-400">1st in Division</span>
+                    <span className="text-emerald-400">1st in Div</span>
                   ) : (
                     <span>{standings.divisionGB} GB Div</span>
                   )}
                   {standings.leagueGB !== '-' && standings.divisionGB !== '-' && (
-                    <span className="text-zinc-600"> · {standings.leagueGB} GB WC</span>
+                    <span className="text-zinc-600"> · {standings.leagueGB} WC</span>
                   )}
                   {standings.leagueGB === '-' && standings.divisionGB !== '-' && (
                     <span className="text-amber-400"> · WC Spot</span>
@@ -142,16 +194,19 @@ function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading:
             </div>
           </div>
         </div>
-        <button onClick={onRemove} className="text-zinc-700 hover:text-red-400 text-xs transition">✕</button>
       </div>
 
       <div className="divide-y divide-zinc-800/60">
-        {/* Live game */}
+        {/* Live game — click to open Gamecenter */}
         {liveGame && (
-          <div className="px-5 py-3 bg-green-500/5 border-b border-green-500/20">
+          <button
+            onClick={() => openGame(liveGame)}
+            className="w-full text-left px-5 py-3 bg-green-500/5 border-b border-green-500/20 hover:bg-green-500/10 transition group"
+          >
             <div className="flex items-center gap-1.5 mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               <p className="text-xs text-green-400 uppercase tracking-widest font-mono font-bold">Live · {liveGame.statusDetail}</p>
+              <span className="ml-auto text-[10px] text-green-400/60 font-mono group-hover:text-green-400 transition">Gamecenter →</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -168,13 +223,15 @@ function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading:
                 {liveGame.teamScore}–{liveGame.opponentScore}
               </p>
             </div>
-          </div>
+          </button>
         )}
 
-        {/* Last game */}
+        {/* Last game — click to see recap */}
         {!liveGame && lastGame && (
-          <div className="px-5 py-3">
-            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Last Game</p>
+          <button onClick={() => openGame(lastGame)} className="w-full text-left px-5 py-3 hover:bg-[var(--card)]/40 transition group">
+            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Last Game
+              <span className="float-right text-[10px] text-zinc-700 group-hover:text-zinc-500 transition">Recap →</span>
+            </p>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {lastGame.opponentLogo && (
@@ -200,38 +257,47 @@ function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading:
                 )}
               </div>
             </div>
-          </div>
+          </button>
         )}
 
-        {/* Next game */}
+        {/* Next game — matchup treatment */}
         {nextGame && (
-          <div className="px-5 py-3">
-            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-2">Next Game</p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div className="px-5 py-4">
+            <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-3">Next Game</p>
+            <div className="flex items-center justify-center gap-4 mb-2">
+              <div className="flex flex-col items-center gap-1 flex-1">
+                {team.logo && (
+                  <div className="w-10 h-10 relative">
+                    <Image src={team.logo} alt={team.abbr} fill className="object-contain" unoptimized />
+                  </div>
+                )}
+                <p className="text-[10px] font-mono font-bold text-zinc-300 tracking-wider">{team.abbr}</p>
+              </div>
+              <div className="text-center shrink-0">
+                <p className="text-[10px] font-mono text-zinc-600 tracking-widest">
+                  {nextGame.homeAway === 'home' ? 'VS' : '@'}
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-1 flex-1">
                 {nextGame.opponentLogo && (
-                  <div className="w-6 h-6 relative shrink-0">
+                  <div className="w-10 h-10 relative">
                     <Image src={nextGame.opponentLogo} alt={nextGame.opponentAbbr} fill className="object-contain" unoptimized />
                   </div>
                 )}
-                <div>
-                  <p className="text-sm text-zinc-300">
-                    {nextGame.homeAway === 'home' ? 'vs' : '@'} {nextGame.opponentAbbr}
-                  </p>
-                  <p className="text-xs text-zinc-600">
-                    {formatGameDate(nextGame.date)} · {formatGameTime(nextGame.date)}
-                    {nextGame.venue ? ` · ${nextGame.venue}` : ''}
-                  </p>
-                  {nextGame.probablePitchers && (nextGame.probablePitchers.ours || nextGame.probablePitchers.theirs) && (
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {nextGame.probablePitchers.ours && `⚾ ${nextGame.probablePitchers.ours}`}
-                      {nextGame.probablePitchers.ours && nextGame.probablePitchers.theirs && ' vs '}
-                      {nextGame.probablePitchers.theirs && nextGame.probablePitchers.theirs}
-                    </p>
-                  )}
-                </div>
+                <p className="text-[10px] font-mono font-bold text-zinc-300 tracking-wider">{nextGame.opponentAbbr}</p>
               </div>
             </div>
+            <p className="text-xs text-zinc-500 text-center font-mono">
+              {formatGameDate(nextGame.date)} · {formatGameTime(nextGame.date)}
+              {nextGame.venue ? ` · ${nextGame.venue}` : ''}
+            </p>
+            {nextGame.probablePitchers && (nextGame.probablePitchers.ours || nextGame.probablePitchers.theirs) && (
+              <p className="text-xs text-zinc-500 text-center mt-1">
+                {nextGame.probablePitchers.ours && `⚾ ${nextGame.probablePitchers.ours}`}
+                {nextGame.probablePitchers.ours && nextGame.probablePitchers.theirs && ' vs '}
+                {nextGame.probablePitchers.theirs && nextGame.probablePitchers.theirs}
+              </p>
+            )}
           </div>
         )}
 
@@ -380,7 +446,7 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
 
 function feedKey(f: FollowedTeam) { return `${f.league}-${f.teamId}`; }
 
-function TonightStrip({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
+function TonightStrip({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | null>; onOpenGame: (t: GameCenterTarget) => void }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -429,10 +495,18 @@ function TonightStrip({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
         {items.map(({ feed, game, kind }) => {
           const accent = hexColor(feed.team.color) ?? hexColor(feed.team.altColor);
           const isLive = kind === 'live';
+          const leagueLower = feed.team.league.toLowerCase();
+          const sportForLeague =
+            leagueLower === 'nfl' || leagueLower === 'ncaaf' ? 'football'
+              : leagueLower === 'nba' ? 'basketball'
+              : leagueLower === 'mlb' ? 'baseball'
+              : 'football';
+          const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
           return (
-            <div
+            <button
               key={feed.team.id + game.date}
-              className={`shrink-0 min-w-[220px] rounded-xl border-l-4 bg-[var(--card)] px-3.5 py-2.5 flex items-center gap-2.5 ${
+              onClick={() => game.id && onOpenGame({ sport: sportForLeague, league: apiLeague, eventId: game.id })}
+              className={`shrink-0 min-w-[220px] rounded-xl border-l-4 bg-[var(--card)] px-3.5 py-2.5 flex items-center gap-2.5 text-left transition hover:brightness-125 ${
                 isLive ? 'border-y border-r border-green-500/30 bg-green-500/5' : 'border-y border-r border-zinc-800'
               }`}
               style={accent ? { borderLeftColor: accent } : undefined}
@@ -460,7 +534,7 @@ function TonightStrip({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
                   <Image src={game.opponentLogo} alt={game.opponentAbbr} fill className="object-contain" unoptimized />
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -474,6 +548,7 @@ export default function SportsTab() {
   const [mounted, setMounted] = useState(false);
   const [feeds, setFeeds] = useState<Record<string, TeamFeed | null>>({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
+  const [gcTarget, setGcTarget] = useState<GameCenterTarget>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -533,7 +608,7 @@ export default function SportsTab() {
         </button>
       </div>
 
-      <TonightStrip feeds={feeds} />
+      <TonightStrip feeds={feeds} onOpenGame={setGcTarget} />
 
       {followed.length === 0 ? (
         <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
@@ -549,6 +624,7 @@ export default function SportsTab() {
                 feed={feeds[key] ?? null}
                 loading={loadingKeys.has(key) && feeds[key] === undefined}
                 onRemove={() => removeTeam(f.teamId, f.league)}
+                onOpenGame={setGcTarget}
               />
             );
           })}
@@ -560,6 +636,15 @@ export default function SportsTab() {
           followed={followed}
           onAdd={addTeam}
           onClose={() => setShowAdd(false)}
+        />
+      )}
+
+      {gcTarget && (
+        <GameCenter
+          sport={gcTarget.sport}
+          league={gcTarget.league}
+          eventId={gcTarget.eventId}
+          onClose={() => setGcTarget(null)}
         />
       )}
     </div>
