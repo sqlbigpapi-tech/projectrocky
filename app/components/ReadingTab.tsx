@@ -129,9 +129,12 @@ function AddBookModal({ onAdd, onClose }: {
   const canSave = selected ? true : title.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-start md:items-center justify-center z-50 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-[var(--card)] border border-zinc-800 rounded-xl w-full max-w-lg flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-0 md:p-4 overflow-y-auto" onClick={onClose}>
+      <div
+        className="bg-[var(--card)] border border-zinc-800 w-full md:max-w-lg md:rounded-xl min-h-screen md:min-h-0 md:my-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-[var(--card)] z-10">
           <p className="text-sm font-bold text-white">Add a Book</p>
           <button onClick={onClose} className="text-zinc-600 hover:text-white transition">✕</button>
         </div>
@@ -148,7 +151,7 @@ function AddBookModal({ onAdd, onClose }: {
                 className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none transition"
               />
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto">
               {searching && <div className="p-6 text-center text-zinc-600 text-sm">Searching…</div>}
               {!searching && query.length >= 2 && results.length === 0 && (
                 <div className="p-6 text-center text-zinc-600 text-sm">
@@ -244,6 +247,107 @@ function AddBookModal({ onAdd, onClose }: {
           </button>
           <button onClick={onClose} className="text-zinc-500 hover:text-white text-xs px-4 py-2 rounded-lg border border-zinc-800 hover:border-zinc-600 transition">
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkImportModal({ onDone, onClose }: { onDone: (added: number) => void; onClose: () => void }) {
+  const [text, setText] = useState('');
+  const [status, setStatus] = useState<'finished' | 'wishlist'>('finished');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ parsed: number; added: number; skipped: number; message?: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit() {
+    if (!text.trim()) return;
+    setLoading(true);
+    setErr(null);
+    setResult(null);
+    try {
+      const res = await fetch('/api/book-bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, defaultStatus: status }),
+      });
+      const data = await res.json();
+      if (data.error) setErr(data.error);
+      else {
+        setResult({ parsed: data.parsed, added: data.added, skipped: data.skipped, message: data.message });
+        if (data.added > 0) onDone(data.added);
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Import failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-0 md:p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-[var(--card)] border border-zinc-800 w-full md:max-w-xl md:rounded-xl min-h-screen md:min-h-0 md:my-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-[var(--card)] z-10">
+          <p className="text-sm font-bold text-white">Bulk Import</p>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white transition">✕</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            Paste your audiobook list in any format — bullet points, commas, copy-paste from Notes, or just one per line.
+            Claude will parse it, Open Library will enrich with covers and lengths, and anything already in your library gets skipped.
+          </p>
+
+          <textarea
+            autoFocus
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={`Project Hail Mary — Andy Weir\nRed Rising, Pierce Brown\n- The Power Law (Sebastian Mallaby)\n...`}
+            rows={12}
+            className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-700 resize-y font-mono focus:outline-none transition"
+          />
+
+          <div className="flex items-center gap-3">
+            <label className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest">Import as</label>
+            <div className="flex gap-1.5">
+              {(['finished', 'wishlist'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatus(s)}
+                  className={`text-xs font-bold font-mono px-3 py-1 rounded-lg border transition ${
+                    status === s ? 'bg-amber-500 text-black border-amber-500' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'
+                  }`}
+                >
+                  {s === 'finished' ? 'Finished' : 'Wishlist'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {err && <p className="text-xs text-red-400">{err}</p>}
+
+          {result && (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 text-xs">
+              <p className="text-emerald-400 font-bold">
+                Added {result.added} of {result.parsed} books.
+                {result.skipped > 0 && <span className="text-zinc-500 font-normal"> ({result.skipped} skipped as duplicates)</span>}
+              </p>
+              {result.message && <p className="text-zinc-500 mt-1">{result.message}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2 px-5 py-3 border-t border-zinc-800 sticky bottom-0 bg-[var(--card)]">
+          <button
+            onClick={submit}
+            disabled={loading || !text.trim()}
+            className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs py-2 rounded-lg transition"
+          >
+            {loading ? 'Parsing + enriching…' : result ? 'Import more' : 'Import'}
+          </button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-xs px-4 py-2 rounded-lg border border-zinc-800 hover:border-zinc-600 transition">
+            {result ? 'Done' : 'Cancel'}
           </button>
         </div>
       </div>
@@ -462,8 +566,15 @@ export default function ReadingTab() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const [view, setView] = useState<'library' | 'wishlist'>('library');
   const { toast } = useToast();
+
+  async function reloadBooks() {
+    const res = await fetch('/api/books');
+    const { books } = await res.json();
+    setBooks(books ?? []);
+  }
 
   useEffect(() => {
     fetch('/api/books')
@@ -546,12 +657,20 @@ export default function ReadingTab() {
           <p className="text-sm text-zinc-500">{booksThisYear} this year</p>
           {avgRating != null && <p className="text-sm text-zinc-500">avg <span className="text-amber-400 font-mono">{avgRating.toFixed(1)}</span></p>}
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs px-4 py-2 rounded-lg transition"
-        >
-          + Add Book
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBulk(true)}
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold px-3 py-2 rounded-lg transition border border-zinc-700"
+          >
+            Bulk Import
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs px-4 py-2 rounded-lg transition"
+          >
+            + Add Book
+          </button>
+        </div>
       </div>
 
       {/* Currently listening */}
@@ -607,6 +726,12 @@ export default function ReadingTab() {
       <RecsPanel onSave={saveRec} onDismiss={dismissRec} />
 
       {showAdd && <AddBookModal onAdd={addBook} onClose={() => setShowAdd(false)} />}
+      {showBulk && (
+        <BulkImportModal
+          onDone={(n) => { toast(`Imported ${n} books`, 'success'); reloadBooks(); }}
+          onClose={() => setShowBulk(false)}
+        />
+      )}
     </div>
   );
 }
