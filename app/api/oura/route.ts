@@ -56,9 +56,27 @@ type CachedResponse = {
   activity: unknown[];
 };
 
-// Module-level cache. Oura data updates at most once a day; 15 min is plenty.
-let cached: { at: number; endDate: string; data: CachedResponse } | null = null;
-const CACHE_MS = 15 * 60 * 1000;
+// Two-tier cache: module-level for warm instances, Supabase-backed for cold starts.
+// Oura data updates at most once a day; 30 min TTL is plenty.
+let memCache: { at: number; endDate: string; data: CachedResponse } | null = null;
+const CACHE_MS = 30 * 60 * 1000;
+const CACHE_KEY = 'oura_cache_v1';
+
+type PersistedCache = { at: number; endDate: string; data: CachedResponse };
+
+async function readPersistedCache(db: ReturnType<typeof getSupabase>): Promise<PersistedCache | null> {
+  const { data } = await db.from('settings').select('value').eq('key', CACHE_KEY).maybeSingle();
+  if (!data?.value) return null;
+  try {
+    return JSON.parse(data.value) as PersistedCache;
+  } catch {
+    return null;
+  }
+}
+
+async function writePersistedCache(db: ReturnType<typeof getSupabase>, payload: PersistedCache) {
+  await db.from('settings').upsert({ key: CACHE_KEY, value: JSON.stringify(payload) }, { onConflict: 'key' });
+}
 
 export async function GET() {
   const db = getSupabase();
@@ -71,10 +89,19 @@ export async function GET() {
   const startDate = start.toISOString().split('T')[0];
   const endDate   = end.toISOString().split('T')[0];
 
-  if (cached && cached.endDate === endDate && Date.now() - cached.at < CACHE_MS) {
-    return NextResponse.json({ ...cached.data, cached: true });
+  // Tier 1: warm-instance module cache
+  if (memCache && memCache.endDate === endDate && Date.now() - memCache.at < CACHE_MS) {
+    return NextResponse.json(memCache.data);
   }
 
+  // Tier 2: Supabase-backed cache — survives cold starts
+  const persisted = await readPersistedCache(db);
+  if (persisted && persisted.endDate === endDate && Date.now() - persisted.at < CACHE_MS) {
+    memCache = persisted;
+    return NextResponse.json(persisted.data);
+  }
+
+  // Tier 3: live fetch from Oura
   try {
     const [readiness, sleep, activity, sleepSessions] = await Promise.all([
       ouraFetch('daily_readiness', token, startDate, endDate),
@@ -83,7 +110,6 @@ export async function GET() {
       ouraFetch('sleep',           token, startDate, endDate),
     ]);
 
-    // daily_sleep has scores; sleep sessions have durations/HRV/HR — merge by day
     const sessionsByDay = new Map<string, Record<string, unknown>>();
     for (const s of (sleepSessions.data ?? [])) {
       if (s.type === 'long_sleep' || !sessionsByDay.has(s.day)) {
@@ -100,10 +126,15 @@ export async function GET() {
       sleep:     mergedSleep,
       activity:  activity.data  ?? [],
     };
-    cached = { at: Date.now(), endDate, data };
+    const payload = { at: Date.now(), endDate, data };
+    memCache = payload;
+    // Fire-and-forget persist; don't block the response on it
+    writePersistedCache(db, payload).catch(() => {});
 
     return NextResponse.json(data);
   } catch (e: unknown) {
+    // On Oura failure, serve the last persisted cache if we have one (stale is better than error)
+    if (persisted) return NextResponse.json({ ...persisted.data, stale: true });
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Oura fetch failed' }, { status: 500 });
   }
 }
