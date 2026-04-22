@@ -50,6 +50,16 @@ async function ouraFetch(path: string, token: string, startDate: string, endDate
   return res.json();
 }
 
+type CachedResponse = {
+  readiness: unknown[];
+  sleep: unknown[];
+  activity: unknown[];
+};
+
+// Module-level cache. Oura data updates at most once a day; 15 min is plenty.
+let cached: { at: number; endDate: string; data: CachedResponse } | null = null;
+const CACHE_MS = 15 * 60 * 1000;
+
 export async function GET() {
   const db = getSupabase();
   const token = await getValidToken(db);
@@ -60,6 +70,10 @@ export async function GET() {
   start.setDate(start.getDate() - 30);
   const startDate = start.toISOString().split('T')[0];
   const endDate   = end.toISOString().split('T')[0];
+
+  if (cached && cached.endDate === endDate && Date.now() - cached.at < CACHE_MS) {
+    return NextResponse.json({ ...cached.data, cached: true });
+  }
 
   try {
     const [readiness, sleep, activity, sleepSessions] = await Promise.all([
@@ -81,17 +95,15 @@ export async function GET() {
       ...d,
     }));
 
-    return NextResponse.json({
+    const data: CachedResponse = {
       readiness: readiness.data ?? [],
       sleep:     mergedSleep,
       activity:  activity.data  ?? [],
-      _debug: {
-        sessionCount: sleepSessions.data?.length ?? 0,
-        firstSession: sleepSessions.data?.[0] ?? null,
-        firstDailyDay: sleep.data?.[0]?.day ?? null,
-      },
-    });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    };
+    cached = { at: Date.now(), endDate, data };
+
+    return NextResponse.json(data);
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Oura fetch failed' }, { status: 500 });
   }
 }
