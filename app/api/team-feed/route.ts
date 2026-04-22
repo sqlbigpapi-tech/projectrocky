@@ -190,6 +190,8 @@ export async function GET(request: Request) {
         logo: str(team.logo ?? team.logos?.[0]?.href),
         league: leagueLabel(sport, league),
         record,
+        color: str(team.color) || null,
+        altColor: str(team.alternateColor) || null,
       },
       liveGame: parseGame(liveEvent),
       lastGame: parseGame(lastEvent),

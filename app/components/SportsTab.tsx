@@ -24,13 +24,20 @@ type NewsItem = { id: string; type: string; headline: string; image: string; lin
 type Standings = { divisionGB: string; leagueGB: string; playoffSeed: number; record: string; streak: string };
 
 type TeamFeed = {
-  team: { id: string; name: string; abbr: string; logo: string; league: string; record: string | null };
+  team: { id: string; name: string; abbr: string; logo: string; league: string; record: string | null; color: string | null; altColor: string | null };
   liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
   news: NewsItem[];
   standings: Standings | null;
 };
+
+function hexColor(c: string | null | undefined): string | null {
+  if (!c) return null;
+  const trimmed = c.trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(trimmed)) return null;
+  return `#${trimmed}`;
+}
 
 const LEAGUE_OPTIONS = [
   { sport: 'football', league: 'nfl', label: 'NFL' },
@@ -73,18 +80,8 @@ function formatGameTime(dateStr: string) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: () => void }) {
-  const [feed, setFeed] = useState<TeamFeed | null>(null);
-  const [loading, setLoading] = useState(true);
+function TeamCard({ feed, loading, onRemove }: { feed: TeamFeed | null; loading: boolean; onRemove: () => void }) {
   const [newsExpanded, setNewsExpanded] = useState(false);
-
-  useEffect(() => {
-    const { sport, league, teamId } = followed;
-    fetch(`/api/team-feed?sport=${sport}&league=${league}&teamId=${teamId}`)
-      .then(r => r.json())
-      .then(d => { if (!d.error) setFeed(d); })
-      .finally(() => setLoading(false));
-  }, [followed.teamId]);
 
   if (loading) {
     return <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />;
@@ -99,12 +96,14 @@ function TeamCard({ followed, onRemove }: { followed: FollowedTeam; onRemove: ()
   }
 
   const { team, liveGame, lastGame, nextGame, news, standings } = feed;
-  // Make feed accessible for standings display
-  const feedData = feed;
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
+  const accent = hexColor(team.color) ?? hexColor(team.altColor);
 
   return (
-    <div className="bg-[var(--card)] border border-zinc-800 rounded-xl overflow-hidden">
+    <div
+      className="bg-[var(--card)] border border-zinc-800 border-l-4 rounded-xl overflow-hidden"
+      style={accent ? { borderLeftColor: accent } : undefined}
+    >
       {/* Team header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
         <div className="flex items-center gap-3">
@@ -379,16 +378,132 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
   );
 }
 
+function feedKey(f: FollowedTeam) { return `${f.league}-${f.teamId}`; }
+
+function TonightStrip({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  type Item = { feed: TeamFeed; game: GameInfo; kind: 'live' | 'today' };
+  const items: Item[] = [];
+  for (const feed of Object.values(feeds)) {
+    if (!feed) continue;
+    if (feed.liveGame) {
+      items.push({ feed, game: feed.liveGame, kind: 'live' });
+      continue;
+    }
+    if (feed.nextGame) {
+      const hoursAway = (new Date(feed.nextGame.date).getTime() - now) / 3600000;
+      if (hoursAway > 0 && hoursAway < 24) {
+        items.push({ feed, game: feed.nextGame, kind: 'today' });
+      }
+    }
+  }
+  items.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'live' ? -1 : 1;
+    return new Date(a.game.date).getTime() - new Date(b.game.date).getTime();
+  });
+
+  if (items.length === 0) return null;
+
+  function countdown(dateStr: string): string {
+    const diff = new Date(dateStr).getTime() - now;
+    if (diff <= 0) return 'starting';
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    if (hrs > 0) return `in ${hrs}h ${mins}m`;
+    return `in ${mins}m`;
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[11px] font-bold font-mono uppercase tracking-widest text-amber-400">Tonight</span>
+        <div className="flex-1 h-px bg-zinc-800/60" />
+        <span className="text-[10px] text-zinc-600 font-mono">{items.length}</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {items.map(({ feed, game, kind }) => {
+          const accent = hexColor(feed.team.color) ?? hexColor(feed.team.altColor);
+          const isLive = kind === 'live';
+          return (
+            <div
+              key={feed.team.id + game.date}
+              className={`shrink-0 min-w-[220px] rounded-xl border-l-4 bg-[var(--card)] px-3.5 py-2.5 flex items-center gap-2.5 ${
+                isLive ? 'border-y border-r border-green-500/30 bg-green-500/5' : 'border-y border-r border-zinc-800'
+              }`}
+              style={accent ? { borderLeftColor: accent } : undefined}
+            >
+              {feed.team.logo && (
+                <div className="w-8 h-8 relative shrink-0">
+                  <Image src={feed.team.logo} alt={feed.team.abbr} fill className="object-contain" unoptimized />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-bold text-white truncate">
+                    {feed.team.abbr} {game.homeAway === 'home' ? 'vs' : '@'} {game.opponentAbbr}
+                  </p>
+                  {isLive && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />}
+                </div>
+                <p className={`text-[10px] font-mono truncate ${isLive ? 'text-green-400' : 'text-zinc-500'}`}>
+                  {isLive
+                    ? `${game.statusDetail} · ${game.teamScore}–${game.opponentScore}`
+                    : `${formatGameTime(game.date)} · ${countdown(game.date)}`}
+                </p>
+              </div>
+              {game.opponentLogo && (
+                <div className="w-6 h-6 relative shrink-0 opacity-60">
+                  <Image src={game.opponentLogo} alt={game.opponentAbbr} fill className="object-contain" unoptimized />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function SportsTab() {
   const [followed, setFollowed] = useState<FollowedTeam[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [feeds, setFeeds] = useState<Record<string, TeamFeed | null>>({});
+  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     setFollowed(stored ? JSON.parse(stored) : DEFAULT_TEAMS);
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const currentKeys = new Set(followed.map(feedKey));
+    // Drop feeds for teams no longer followed
+    setFeeds(prev => {
+      const next: Record<string, TeamFeed | null> = {};
+      for (const k of Object.keys(prev)) if (currentKeys.has(k)) next[k] = prev[k];
+      return next;
+    });
+    // Fetch feeds we don't already have
+    for (const f of followed) {
+      const key = feedKey(f);
+      if (feeds[key] !== undefined) continue;
+      setLoadingKeys(prev => new Set(prev).add(key));
+      fetch(`/api/team-feed?sport=${f.sport}&league=${f.league}&teamId=${f.teamId}`)
+        .then(r => r.json())
+        .then(d => setFeeds(prev => ({ ...prev, [key]: d.error ? null : d })))
+        .catch(() => setFeeds(prev => ({ ...prev, [key]: null })))
+        .finally(() => setLoadingKeys(prev => {
+          const next = new Set(prev); next.delete(key); return next;
+        }));
+    }
+  }, [followed, mounted]);
 
   function save(teams: FollowedTeam[]) {
     setFollowed(teams);
@@ -418,19 +533,25 @@ export default function SportsTab() {
         </button>
       </div>
 
+      <TonightStrip feeds={feeds} />
+
       {followed.length === 0 ? (
         <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
           No teams followed yet. Hit "+ Follow Team" to get started.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {followed.map(f => (
-            <TeamCard
-              key={`${f.league}-${f.teamId}`}
-              followed={f}
-              onRemove={() => removeTeam(f.teamId, f.league)}
-            />
-          ))}
+          {followed.map(f => {
+            const key = feedKey(f);
+            return (
+              <TeamCard
+                key={key}
+                feed={feeds[key] ?? null}
+                loading={loadingKeys.has(key) && feeds[key] === undefined}
+                onRemove={() => removeTeam(f.teamId, f.league)}
+              />
+            );
+          })}
         </div>
       )}
 
