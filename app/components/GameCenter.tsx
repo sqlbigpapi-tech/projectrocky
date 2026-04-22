@@ -22,6 +22,26 @@ type ScoringPlay = {
 type LeaderPlayer = { name: string; stat: string; teamAbbr: string };
 type LeaderCategory = { category: string; players: LeaderPlayer[] };
 type WinProbPoint = { play: number; homePct: number };
+type LineScore = {
+  periods: number;
+  periodLabels: string[];
+  home: string[];
+  away: string[];
+  totals: { home: string; away: string };
+  extras?: { label: string; home: string; away: string }[];
+};
+type TeamStatLine = { label: string; home: string; away: string };
+type MLBSituation = {
+  balls: number;
+  strikes: number;
+  outs: number;
+  onFirst: boolean;
+  onSecond: boolean;
+  onThird: boolean;
+  batter: string | null;
+  pitcher: string | null;
+  lastPlay: string | null;
+};
 
 type Summary = {
   eventId: string;
@@ -34,6 +54,9 @@ type Summary = {
   away: Competitor | null;
   venue: string;
   date: string;
+  linescore: LineScore | null;
+  teamStats: TeamStatLine[];
+  situation: MLBSituation | null;
   scoringPlays: ScoringPlay[];
   leaders: LeaderCategory[];
   winProbability: WinProbPoint[];
@@ -56,6 +79,102 @@ function periodLabel(league: string, period: number): string {
 function ordinal(n: number): string {
   const s = ['th','st','nd','rd'], v = n % 100;
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
+
+function Linescore({ ls, awayAbbr, homeAbbr }: { ls: LineScore; awayAbbr: string; homeAbbr: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs font-mono tabular-nums">
+        <thead>
+          <tr className="text-zinc-600">
+            <th className="text-left font-normal pb-1.5 pr-3">&nbsp;</th>
+            {ls.periodLabels.map((p, i) => (
+              <th key={i} className="text-center font-normal pb-1.5 px-1.5 min-w-[22px]">{p}</th>
+            ))}
+            <th className="text-center font-bold pb-1.5 px-2 text-zinc-400">R</th>
+            {ls.extras?.map(e => (
+              <th key={e.label} className="text-center font-bold pb-1.5 px-2 text-zinc-500">{e.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="text-zinc-300">
+            <td className="py-1 pr-3 font-bold text-zinc-400">{awayAbbr}</td>
+            {ls.away.map((v, i) => (
+              <td key={i} className="text-center py-1 px-1.5">{v || '·'}</td>
+            ))}
+            <td className="text-center py-1 px-2 font-bold text-white">{ls.totals.away}</td>
+            {ls.extras?.map(e => (
+              <td key={e.label} className="text-center py-1 px-2 text-zinc-400">{e.away || '·'}</td>
+            ))}
+          </tr>
+          <tr className="text-zinc-300">
+            <td className="py-1 pr-3 font-bold text-zinc-400">{homeAbbr}</td>
+            {ls.home.map((v, i) => (
+              <td key={i} className="text-center py-1 px-1.5">{v || '·'}</td>
+            ))}
+            <td className="text-center py-1 px-2 font-bold text-white">{ls.totals.home}</td>
+            {ls.extras?.map(e => (
+              <td key={e.label} className="text-center py-1 px-2 text-zinc-400">{e.home || '·'}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TeamStats({ stats, awayAbbr, homeAbbr }: { stats: TeamStatLine[]; awayAbbr: string; homeAbbr: string }) {
+  return (
+    <div className="text-xs">
+      <div className="flex items-center gap-3 mb-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
+        <span className="flex-1 text-right text-zinc-400 font-bold">{awayAbbr}</span>
+        <span className="w-24 text-center">Stat</span>
+        <span className="flex-1 text-left text-zinc-400 font-bold">{homeAbbr}</span>
+      </div>
+      <div className="space-y-1">
+        {stats.map(s => (
+          <div key={s.label} className="flex items-center gap-3">
+            <span className="flex-1 text-right font-mono tabular-nums text-zinc-300">{s.away || '—'}</span>
+            <span className="w-24 text-center text-[10px] font-mono uppercase tracking-wider text-zinc-500 truncate" title={s.label}>{s.label}</span>
+            <span className="flex-1 text-left font-mono tabular-nums text-zinc-300">{s.home || '—'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MLBLive({ s }: { s: MLBSituation }) {
+  const dot = (on: boolean) => on ? 'bg-amber-400' : 'bg-zinc-800 border border-zinc-700';
+  return (
+    <div className="flex items-center gap-5">
+      {/* Bases diamond */}
+      <div className="relative w-[60px] h-[60px] shrink-0" aria-label="Runners on base">
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rotate-45 ${dot(s.onSecond)}`} />
+        <div className={`absolute top-1/2 right-0 -translate-y-1/2 w-3.5 h-3.5 rotate-45 ${dot(s.onFirst)}`} />
+        <div className={`absolute top-1/2 left-0 -translate-y-1/2 w-3.5 h-3.5 rotate-45 ${dot(s.onThird)}`} />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rotate-45 bg-zinc-800 border border-zinc-700" />
+      </div>
+      {/* Count + outs */}
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+          <span className="w-10">Count</span>
+          <span className="text-white font-bold tabular-nums">{s.balls}-{s.strikes}</span>
+          <span className="mx-2 text-zinc-700">|</span>
+          <span>Outs</span>
+          <div className="flex gap-1">
+            {[0, 1, 2].map(i => (
+              <span key={i} className={`w-1.5 h-1.5 rounded-full ${i < s.outs ? 'bg-red-400' : 'bg-zinc-800 border border-zinc-700'}`} />
+            ))}
+          </div>
+        </div>
+        {s.batter && <p className="text-xs text-zinc-300"><span className="text-zinc-500 font-mono">AB</span> {s.batter}</p>}
+        {s.pitcher && <p className="text-xs text-zinc-300"><span className="text-zinc-500 font-mono">P</span> {s.pitcher}</p>}
+        {s.lastPlay && <p className="text-[11px] text-zinc-500 italic line-clamp-2">{s.lastPlay}</p>}
+      </div>
+    </div>
+  );
 }
 
 function WinProbBar({ points }: { points: WinProbPoint[] }) {
@@ -195,6 +314,25 @@ export default function GameCenter({
 
           {summary && (
             <div className="divide-y divide-zinc-800/60">
+              {/* Linescore */}
+              {summary.linescore && summary.home && summary.away && (
+                <div className="px-5 py-4">
+                  <Linescore
+                    ls={summary.linescore}
+                    awayAbbr={summary.away.abbr}
+                    homeAbbr={summary.home.abbr}
+                  />
+                </div>
+              )}
+
+              {/* MLB live situation — bases, count, outs */}
+              {summary.situation && (
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-green-400 mb-2.5">On the Field</p>
+                  <MLBLive s={summary.situation} />
+                </div>
+              )}
+
               {/* Win probability */}
               {summary.winProbability.length > 1 && (
                 <div className="px-5 py-4">
@@ -221,6 +359,18 @@ export default function GameCenter({
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Team stats side-by-side */}
+              {summary.teamStats.length > 0 && summary.home && summary.away && (
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2.5">Team Stats</p>
+                  <TeamStats
+                    stats={summary.teamStats.slice(0, 10)}
+                    awayAbbr={summary.away.abbr}
+                    homeAbbr={summary.home.abbr}
+                  />
                 </div>
               )}
 
