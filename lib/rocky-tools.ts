@@ -397,6 +397,59 @@ export function makeRockyTools(baseUrl: string) {
       },
     }),
 
+    list_books: tool({
+      description: 'List audiobooks David has logged. Filter by status to find currently-listening, finished, wishlist, or dismissed titles. Use when he asks what he is reading, what he has read, or for a wishlist checkin.',
+      inputSchema: z.object({
+        status: z.enum(['listening', 'finished', 'wishlist', 'all']).describe('Which bucket to return. "all" omits the filter.'),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+      execute: async ({ status, limit }) => {
+        let q = db.from('books').select('title, author, rating, status, length_minutes, started_at, finished_at');
+        if (status !== 'all') q = q.eq('status', status);
+        q = q.order('updated_at', { ascending: false }).limit(limit);
+        const { data, error } = await q;
+        if (error) return { ok: false, error: error.message };
+        return {
+          ok: true,
+          status,
+          count: data?.length ?? 0,
+          books: (data ?? []).map(b => ({
+            title: b.title,
+            author: b.author,
+            rating: b.rating,
+            status: b.status,
+            length_hours: b.length_minutes ? Math.round((b.length_minutes / 60) * 10) / 10 : null,
+            started_at: b.started_at,
+            finished_at: b.finished_at,
+          })),
+        };
+      },
+    }),
+
+    add_book: tool({
+      description: 'Add a book to David\'s reading tracker. Default status is "wishlist". Use when he says things like "add Project Hail Mary to my wishlist" or "I just started listening to Red Rising".',
+      inputSchema: z.object({
+        title: z.string().describe('Book title'),
+        author: z.string().nullable().describe('Author name if known, else null'),
+        status: z.enum(['listening', 'finished', 'wishlist']).describe('Which bucket; default to wishlist unless he says he\'s reading/finished it'),
+        rating: z.number().int().min(1).max(5).nullable().describe('1-5 rating if status is finished and he gave one'),
+      }),
+      execute: async ({ title, author, status, rating }) => {
+        const today = new Date().toISOString().split('T')[0];
+        const row: Record<string, unknown> = {
+          title,
+          author,
+          status,
+          rating: status === 'finished' ? rating : null,
+          started_at: status === 'listening' ? today : null,
+          finished_at: status === 'finished' ? today : null,
+        };
+        const { data, error } = await db.from('books').insert(row).select('id, title, status').single();
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, book: data };
+      },
+    }),
+
     flag_bill: tool({
       description: 'Mark a recurring task as a bill (sets is_bill = true on the tasks table). Use when the user says things like "flag my AT&T task as a bill" or "that Amex payment is a bill". Fuzzy-matches the task title.',
       inputSchema: z.object({
