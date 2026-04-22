@@ -5,7 +5,6 @@ import SportsTab from './components/SportsTab';
 import TasksTab from './components/TasksTab';
 import IncomeTab from './components/IncomeTab';
 import IncomeChartsTab from './components/IncomeChartsTab';
-import HealthTab from './components/HealthTab';
 import ReadingTab from './components/ReadingTab';
 import NetWorthTab from './components/NetWorthTab';
 import QuickLinks from './components/QuickLinks';
@@ -20,10 +19,10 @@ import AskRocky from './components/AskRocky';
 import GuideTab from './components/GuideTab';
 import {
   BriefingSkeleton, NetWorthSkeleton, SportsSkeleton,
-  TasksSkeleton, HealthSkeleton, IncomeSkeleton,
+  TasksSkeleton, IncomeSkeleton,
 } from './components/Skeletons';
 
-type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'health' | 'reading' | 'notifications' | 'guide';
+type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'reading' | 'notifications' | 'guide';
 type FinanceSubTab = 'income' | 'finmodel' | 'headcount' | 'equity' | 'deib';
 type PersonalSubTab = 'networth' | 'cashflow';
 
@@ -163,13 +162,6 @@ function IconFinance({ className }: { className?: string }) {
     </svg>
   );
 }
-function IconHealth({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 10c0-3.5 3.5-6 7-2.5C13.5 4 17 6.5 17 10c0 4-7 7-7 7s-7-3-7-7z" />
-    </svg>
-  );
-}
 function IconAlerts({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -207,7 +199,6 @@ const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactE
   sports: IconTeams,
   tasks: IconTasks,
   finance: IconFinance,
-  health: IconHealth,
   personal: IconPersonal,
   reading: IconReading,
   notifications: IconAlerts,
@@ -286,7 +277,6 @@ export default function Home() {
     { key: 'tasks', label: 'Tasks', access: ['owner'], section: 'primary' },
     { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'], section: 'primary' },
     { key: 'personal', label: 'Finance', access: ['owner'], section: 'primary' },
-    { key: 'health', label: 'Health', access: ['owner'], section: 'primary' },
     { key: 'reading', label: 'Reading', access: ['owner'], section: 'primary' },
     { key: 'notifications', label: 'Alerts', access: ['owner'], section: 'admin' },
     { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'], section: 'admin' },
@@ -626,7 +616,6 @@ export default function Home() {
             {tab === 'finance' && financeTab === 'deib' && <DEIBTab />}
             {tab === 'personal' && personalTab === 'networth' && <Suspense fallback={<NetWorthSkeleton />}><NetWorthTab /></Suspense>}
             {tab === 'personal' && personalTab === 'cashflow' && <CashFlowTab />}
-            {tab === 'health' && <Suspense fallback={<HealthSkeleton />}><HealthTab /></Suspense>}
             {tab === 'reading' && <ReadingTab />}
 
             {tab === 'notifications' && <NotificationsTab />}
