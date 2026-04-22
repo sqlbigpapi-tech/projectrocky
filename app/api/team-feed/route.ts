@@ -96,7 +96,7 @@ export async function GET(request: Request) {
         date: str(event.date),
         opponent: str(oppComp?.team?.displayName),
         opponentAbbr: str(oppComp?.team?.abbreviation),
-        opponentLogo: str(oppComp?.team?.logo),
+        opponentLogo: str(oppComp?.team?.logo ?? oppComp?.team?.logos?.[0]?.href),
         homeAway: str(ourComp?.homeAway) || 'home',
         teamScore: str(ourComp?.score),
         opponentScore: str(oppComp?.score),

@@ -85,6 +85,25 @@ function formatGameTime(dateStr: string) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+function TeamLogoBadge({ logo, abbr, size }: { logo: string; abbr: string; size: number }) {
+  if (logo) {
+    return (
+      <div className="relative" style={{ width: size, height: size }}>
+        <Image src={logo} alt={abbr} fill className="object-contain" unoptimized />
+      </div>
+    );
+  }
+  const fontSize = Math.round(size * 0.38);
+  return (
+    <div
+      className="rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 font-mono font-bold"
+      style={{ width: size, height: size, fontSize }}
+    >
+      {abbr.slice(0, 3)}
+    </div>
+  );
+}
+
 function FormPips({ last5 }: { last5: ('W' | 'L')[] }) {
   if (!last5 || last5.length === 0) return null;
   return (
@@ -264,27 +283,17 @@ function TeamCard({ feed, loading, onRemove, onOpenGame }: {
         {nextGame && (
           <div className="px-5 py-4">
             <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono mb-3">Next Game</p>
-            <div className="flex items-center justify-center gap-4 mb-2">
-              <div className="flex flex-col items-center gap-1 flex-1">
-                {team.logo && (
-                  <div className="w-10 h-10 relative">
-                    <Image src={team.logo} alt={team.abbr} fill className="object-contain" unoptimized />
-                  </div>
-                )}
-                <p className="text-[10px] font-mono font-bold text-zinc-300 tracking-wider">{team.abbr}</p>
+            <div className="flex items-center justify-center gap-6 mb-2.5">
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <TeamLogoBadge logo={team.logo} abbr={team.abbr} size={44} />
+                <p className="text-[11px] font-mono font-bold text-zinc-300 tracking-wider">{team.abbr}</p>
               </div>
-              <div className="text-center shrink-0">
-                <p className="text-[10px] font-mono text-zinc-600 tracking-widest">
-                  {nextGame.homeAway === 'home' ? 'VS' : '@'}
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-1 flex-1">
-                {nextGame.opponentLogo && (
-                  <div className="w-10 h-10 relative">
-                    <Image src={nextGame.opponentLogo} alt={nextGame.opponentAbbr} fill className="object-contain" unoptimized />
-                  </div>
-                )}
-                <p className="text-[10px] font-mono font-bold text-zinc-300 tracking-wider">{nextGame.opponentAbbr}</p>
+              <p className="text-sm font-mono font-bold text-zinc-500 tracking-widest shrink-0 self-center pb-5">
+                {nextGame.homeAway === 'home' ? 'VS' : '@'}
+              </p>
+              <div className="flex flex-col items-center gap-1.5 w-20">
+                <TeamLogoBadge logo={nextGame.opponentLogo} abbr={nextGame.opponentAbbr} size={44} />
+                <p className="text-[11px] font-mono font-bold text-zinc-300 tracking-wider">{nextGame.opponentAbbr}</p>
               </div>
             </div>
             <p className="text-xs text-zinc-500 text-center font-mono">
