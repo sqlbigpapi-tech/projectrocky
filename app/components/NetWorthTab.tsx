@@ -434,8 +434,10 @@ export default function NetWorthTab() {
       }));
       setSnapshots(snaps);
 
-      let accts = snaps.length > 0 ? snaps[snaps.length - 1].accounts : DEFAULT_ACCOUNTS;
-      if (sharePrice) accts = applySharePrice(accts, sharePrice, savedShares);
+      // SEI shares balance comes from the saved snapshot (updated via Screenshot
+      // import or the Update Balances form) — we no longer recompute it on load
+      // from shares × price, so the last saved value is the source of truth.
+      const accts = snaps.length > 0 ? snaps[snaps.length - 1].accounts : DEFAULT_ACCOUNTS;
       setEditing(accts);
     }).catch(() => setEditing(DEFAULT_ACCOUNTS));
 
