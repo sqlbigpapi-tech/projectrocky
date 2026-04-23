@@ -450,6 +450,65 @@ export function makeRockyTools(baseUrl: string) {
       },
     }),
 
+    list_trips: tool({
+      description: 'List David\'s trips. Filter by status: dream (wishlist), booked (on the calendar), past (taken), or all. Use when he asks what\'s on the dream list, what\'s booked, or about past trips.',
+      inputSchema: z.object({
+        status: z.enum(['dream', 'booked', 'past', 'all']).describe('Which lane to return. "all" omits the filter.'),
+        pr_only: z.boolean().describe('Only return Puerto Rico scouting trips'),
+      }),
+      execute: async ({ status, pr_only }) => {
+        let q = db.from('trips').select('title, destination, country, status, start_date, end_date, budget_estimate, who, rating, is_pr_scouting, why');
+        if (status !== 'all') q = q.eq('status', status);
+        if (pr_only) q = q.eq('is_pr_scouting', true);
+        q = q.order('start_date', { ascending: true, nullsFirst: false }).limit(30);
+        const { data, error } = await q;
+        if (error) return { ok: false, error: error.message };
+        return {
+          ok: true,
+          status,
+          count: data?.length ?? 0,
+          trips: (data ?? []).map(t => ({
+            title: t.title,
+            destination: t.destination,
+            country: t.country,
+            status: t.status,
+            dates: t.start_date ? `${t.start_date}${t.end_date ? ` to ${t.end_date}` : ''}` : null,
+            budget: t.budget_estimate,
+            who: t.who,
+            rating: t.rating,
+            pr_scouting: t.is_pr_scouting,
+            why: t.why,
+          })),
+        };
+      },
+    }),
+
+    add_trip: tool({
+      description: 'Add a trip to David\'s dream list, booked calendar, or past log. Default status is "dream". Use when he says things like "add Italy to my dream list" or "I want to go to Aspen Christmas week" or "we just booked Napa for May 3".',
+      inputSchema: z.object({
+        title: z.string().describe('Trip title'),
+        destination: z.string().nullable().describe('Specific destination, e.g. "Rome + Tuscany"'),
+        country: z.string().nullable().describe('Country or region, e.g. "Italy"'),
+        status: z.enum(['dream', 'booked', 'past']).describe('Default to "dream" unless he specifies otherwise'),
+        who: z.enum(['family', 'couple', 'solo', 'kids']).describe('Who\'s going'),
+        budget_estimate: z.number().int().nullable().describe('Rough budget in USD, or null if unknown'),
+        why: z.string().nullable().describe('Why this trip — quote him if he said something specific'),
+        is_pr_scouting: z.boolean().describe('True if this is a Puerto Rico scouting trip for the PR house dream'),
+      }),
+      execute: async ({ title, destination, country, status, who, budget_estimate, why, is_pr_scouting }) => {
+        const row = {
+          title, destination, country, status, who,
+          budget_estimate,
+          why,
+          is_pr_scouting,
+          added_by: 'rocky',
+        };
+        const { data, error } = await db.from('trips').insert(row).select('id, title, status, is_pr_scouting').single();
+        if (error) return { ok: false, error: error.message };
+        return { ok: true, trip: data };
+      },
+    }),
+
     flag_bill: tool({
       description: 'Mark a recurring task as a bill (sets is_bill = true on the tasks table). Use when the user says things like "flag my AT&T task as a bill" or "that Amex payment is a bill". Fuzzy-matches the task title.',
       inputSchema: z.object({
