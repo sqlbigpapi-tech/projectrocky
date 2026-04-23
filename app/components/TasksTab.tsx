@@ -313,13 +313,19 @@ function TaskCard({ task, onUpdate, onDelete }: {
     );
   }
 
+  const priorityBorder = task.priority === 'High' ? 'border-l-red-400' : task.priority === 'Medium' ? 'border-l-amber-400' : 'border-l-zinc-700';
+
   return (
-    <div className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-150 ${
-      task.completed ? 'opacity-35' :
-      due?.text.includes('overdue') ? 'bg-red-500/5 hover:bg-red-500/8' :
-      due?.text === 'Due today' ? 'bg-amber-500/5 hover:bg-amber-500/8' :
-      'hover:bg-[var(--card)]/60'
-    }`}>
+    <div
+      id={`task-${task.id}`}
+      className={`group relative flex items-center gap-3 pl-3 pr-3.5 py-2.5 rounded-lg border-l-2 transition-all duration-150 ${priorityBorder} ${
+        task.completed ? 'opacity-35' :
+        task.is_bill ? 'bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08]' :
+        due?.text.includes('overdue') ? 'bg-red-500/5 hover:bg-red-500/8' :
+        due?.text === 'Due today' ? 'bg-amber-500/5 hover:bg-amber-500/8' :
+        'hover:bg-[var(--card)]/60'
+      }`}
+    >
       <button
         onClick={() => onUpdate(task.id, { completed: !task.completed })}
         className={`w-[18px] h-[18px] rounded-md border-2 shrink-0 flex items-center justify-center transition-all duration-150 ${
@@ -334,29 +340,30 @@ function TaskCard({ task, onUpdate, onDelete }: {
           </svg>
         )}
       </button>
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        {task.is_bill && (
-          <span
-            className={`shrink-0 w-[18px] h-[18px] rounded-md flex items-center justify-center text-[11px] font-bold font-mono border ${task.completed ? 'bg-zinc-900 text-zinc-600 border-zinc-800' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
-            title="Bill"
-          >
-            $
-          </span>
-        )}
-        <div className="flex-1 min-w-0">
-          <p className={`text-[13px] leading-snug ${task.completed ? 'line-through text-zinc-600' : 'text-zinc-200'}`}>{task.title}</p>
-          {task.notes && !task.completed && <p className="text-[10px] text-zinc-600 truncate mt-0.5">{task.notes}</p>}
-        </div>
+
+      <div className="flex-1 min-w-0">
+        <p className={`text-[13px] leading-snug ${task.completed ? 'line-through text-zinc-600' : 'text-zinc-200'}`}>{task.title}</p>
+        {task.notes && !task.completed && <p className="text-[10px] text-zinc-600 truncate mt-0.5">{task.notes}</p>}
       </div>
+
       <div className="flex items-center gap-2 shrink-0">
         {task.is_bill && task.bill_amount != null && (
-          <span className={`text-[11px] font-mono font-bold tabular-nums ${task.completed ? 'text-zinc-600' : 'text-emerald-400'}`}>
-            ${task.bill_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className={`text-[12px] font-mono font-bold tabular-nums ${task.completed ? 'text-zinc-600' : 'text-emerald-400'}`}>
+            ${task.bill_amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </span>
         )}
-        {task.recurrence && <span className="text-[10px] text-cyan-400/60 font-mono px-1.5 py-0.5 rounded-md bg-cyan-500/5">↻ {task.recurrence}</span>}
-        {due && !task.completed && <span className={`text-[10px] font-mono ${due.color}`}>{due.text}</span>}
+        {(task.recurrence || due) && !task.completed && (
+          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+            due?.text.includes('overdue') ? 'text-red-400 bg-red-500/10' :
+            due?.text === 'Due today' ? 'text-yellow-400 bg-yellow-500/10' :
+            task.recurrence ? 'text-cyan-400/80 bg-cyan-500/5' :
+            'text-zinc-500 bg-zinc-900'
+          }`}>
+            {task.recurrence && '↻ '}{due?.text ?? task.recurrence}
+          </span>
+        )}
       </div>
+
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
         <button onClick={startEdit} className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-600 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Edit">
           <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 2l3 3-7 7H0V9z" /></svg>
@@ -374,6 +381,44 @@ const PRIORITY_DOT: Record<Priority, string> = {
   Medium: 'bg-amber-400',
   Low:    'bg-zinc-500',
 };
+
+function BillsStrip({ bills }: { bills: Task[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (bills.length === 0) return null;
+  const total = bills.reduce((s, b) => s + (b.bill_amount ?? 0), 0);
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] overflow-hidden">
+      <button onClick={() => setExpanded(e => !e)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-emerald-500/[0.08] transition">
+        <div className="flex items-center gap-2.5">
+          <span className="text-[10px] font-bold font-mono uppercase tracking-widest text-emerald-400">Bills · Next 7 days</span>
+          <span className="text-sm font-bold font-mono text-white tabular-nums">${Math.round(total).toLocaleString()}</span>
+          <span className="text-[11px] text-zinc-500 font-mono">across {bills.length}</span>
+        </div>
+        <span className={`text-zinc-500 text-xs transition-transform ${expanded ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {expanded && (
+        <div className="border-t border-emerald-500/10 divide-y divide-emerald-500/5">
+          {bills.map(b => {
+            const due = dueDateLabel(b.due_date);
+            return (
+              <div key={b.id} className="flex items-center justify-between px-4 py-2">
+                <p className="text-xs text-zinc-300 truncate">{b.title}</p>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-[10px] font-mono text-zinc-500">{due?.text ?? ''}</span>
+                  {b.bill_amount != null && (
+                    <span className="text-xs font-mono font-bold text-emerald-400 tabular-nums">
+                      ${b.bill_amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CalendarView({ tasks, onUpdate }: { tasks: Task[]; onUpdate: (id: string, patch: Partial<Task>) => void }) {
   const today = new Date();
@@ -471,6 +516,7 @@ export default function TasksTab() {
   const [categoryFilter, setCategoryFilter] = useState<Category | 'All'>('All');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'All'>('All');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [query, setQuery] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -529,8 +575,10 @@ export default function TasksTab() {
     });
   }
 
+  const q = query.trim().toLowerCase();
   const filtered = tasks.filter(t => {
     if (!showCompleted && t.completed) return false;
+    if (q && !`${t.title} ${t.notes ?? ''}`.toLowerCase().includes(q)) return false;
     return true;
   }).sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
@@ -564,21 +612,49 @@ export default function TasksTab() {
   const completedItems = filtered.filter(t => t.completed);
 
   if (overdueItems.length > 0) buckets.push({ key: 'overdue', label: 'Overdue', color: 'text-red-400', icon: '!', tasks: overdueItems });
-  if (todayItems.length > 0) buckets.push({ key: 'today', label: 'Today', color: 'text-amber-400', icon: '◉', tasks: todayItems });
   if (weekItems.length > 0) buckets.push({ key: 'week', label: 'This Week', color: 'text-blue-400', icon: '→', tasks: weekItems });
   if (laterItems.length > 0) buckets.push({ key: 'later', label: 'Upcoming', color: 'text-zinc-400', icon: '◦', tasks: laterItems });
   if (noDueItems.length > 0) buckets.push({ key: 'nodate', label: 'No Due Date', color: 'text-zinc-600', icon: '—', tasks: noDueItems });
   if (completedItems.length > 0) buckets.push({ key: 'done', label: 'Completed', color: 'text-emerald-400/50', icon: '✓', tasks: completedItems });
 
+  // Bills due in the next 7 days (for the bills strip)
+  const upcomingBills = tasks.filter(t => !t.completed && t.is_bill && t.due_date && t.due_date >= todayISO && t.due_date <= weekEnd)
+    .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''));
+
+  // Today hero — completed + total based on same-day tasks (including recurring that got rolled)
+  const allTodayScoped = tasks.filter(t =>
+    (t.due_date === todayISO) ||
+    (t.completed && t.due_date === todayISO)
+  );
+  const todayTotal = allTodayScoped.length + todayItems.filter(t => t.recurrence && !allTodayScoped.includes(t)).length;
+  const todayDone = allTodayScoped.filter(t => t.completed).length;
+  const todayPct = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : 0;
+
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <p className="text-sm font-medium text-white">{open.length} <span className="text-zinc-500">open</span></p>
           {overdue.length > 0 && <p className="text-sm font-medium text-red-400">{overdue.length} <span className="text-red-400/60">overdue</span></p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-[220px]">
+          <div className="relative flex-1 max-w-xs">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="M12.5 12.5L17 17" />
+            </svg>
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search tasks…"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500/40 rounded-lg pl-8 pr-7 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none transition"
+            />
+            {query && (
+              <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white text-xs">✕</button>
+            )}
+          </div>
           <button
             onClick={() => setShowCompleted(s => !s)}
             className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono border transition ${
@@ -601,34 +677,68 @@ export default function TasksTab() {
 
       {view === 'list' && <>
 
+      {/* Bills strip — only if bills due in next 7 days */}
+      {upcomingBills.length > 0 && (
+        <div className="mb-4">
+          <BillsStrip bills={upcomingBills} />
+        </div>
+      )}
+
       {/* Add task */}
       <div className="mb-5">
         <AddTaskForm onAdd={task => setTasks(prev => [task, ...prev])} />
       </div>
 
-      {/* Task list grouped by bucket */}
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="skeleton h-11 w-full rounded-xl" />
           ))}
         </div>
-      ) : buckets.length === 0 ? (
+      ) : buckets.length === 0 && todayItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-            <span className="text-xl text-zinc-600">✓</span>
+            <span className="text-xl text-zinc-600">{query ? '⌀' : '✓'}</span>
           </div>
-          <p className="text-sm text-zinc-600">All clear. Nice work.</p>
+          <p className="text-sm text-zinc-600">{query ? `No tasks match "${query}"` : 'All clear. Nice work.'}</p>
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
+          {/* Today hero */}
+          {(todayItems.length > 0 || todayDone > 0) && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-4">
+              <div className="flex items-end justify-between mb-3">
+                <div>
+                  <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-amber-400">Today</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-white">
+                    {todayDone}<span className="text-zinc-600 text-base font-normal"> / {todayTotal}</span>
+                    <span className="text-sm text-zinc-500 font-normal ml-2">done</span>
+                  </p>
+                </div>
+                <p className="text-xs font-mono text-amber-400/80 tabular-nums">{todayPct}%</p>
+              </div>
+              <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${todayPct}%` }} />
+              </div>
+              {todayItems.length > 0 ? (
+                <div className="space-y-0.5">
+                  {todayItems.map(task => (
+                    <TaskCard key={task.id} task={task} onUpdate={handleUpdate} onDelete={handleDelete} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500 italic">All today's tasks are done. Enjoy it.</p>
+              )}
+            </div>
+          )}
+
+          {/* Other buckets — quieter */}
           {buckets.map(bucket => (
             <div key={bucket.key}>
               <div className="flex items-center gap-2 mb-2 px-1">
-                <span className={`text-xs font-bold ${bucket.color}`}>{bucket.icon}</span>
-                <span className={`text-[11px] font-bold font-mono uppercase tracking-widest ${bucket.color}`}>{bucket.label}</span>
+                <span className={`text-[10px] font-bold font-mono uppercase tracking-widest ${bucket.color}`}>{bucket.label}</span>
                 <span className="text-[10px] text-zinc-700 font-mono">{bucket.tasks.length}</span>
-                <div className="flex-1 h-px bg-zinc-800/60 ml-2" />
+                <div className="flex-1 h-px bg-zinc-800/60 ml-1" />
               </div>
               <div className="space-y-0.5">
                 {bucket.tasks.map(task => (

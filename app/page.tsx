@@ -221,6 +221,21 @@ export default function Home() {
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [rockyOpen, setRockyOpen] = useState(false);
 
+  type SpotlightTask = { id: string; title: string; due_date: string | null; is_bill: boolean };
+  const [openTasks, setOpenTasks] = useState<SpotlightTask[]>([]);
+  useEffect(() => {
+    fetch('/api/tasks')
+      .then(r => r.json())
+      .then(({ tasks }) => {
+        setOpenTasks((tasks ?? [])
+          .filter((t: { completed: boolean }) => !t.completed)
+          .map((t: { id: string; title: string; due_date: string | null; is_bill: boolean }) => ({
+            id: t.id, title: t.title, due_date: t.due_date, is_bill: !!t.is_bill,
+          })));
+      })
+      .catch(() => {});
+  }, []);
+
   // Cmd+K / Ctrl+K to open spotlight
   useEffect(() => {
     function handleCmdK(e: KeyboardEvent) {
@@ -347,6 +362,24 @@ export default function Home() {
       sublabel: 'Finance',
       section: 'Finance',
       action: () => { setTab('personal'); setPersonalTab(s.key); setPersonalOpen(true); },
+    })),
+    // Open tasks (jump to Tasks tab; will auto-scroll to the row via hash)
+    ...openTasks.map(t => ({
+      id: `task-${t.id}`,
+      label: t.title,
+      sublabel: t.due_date ? `Due ${t.due_date}` : (t.is_bill ? 'Bill' : 'Task'),
+      section: t.is_bill ? 'Bills' : 'Tasks',
+      action: () => {
+        setTab('tasks');
+        setTimeout(() => {
+          const el = document.getElementById(`task-${t.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-amber-400/60');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400/60'), 1800);
+          }
+        }, 100);
+      },
     })),
     // Quick actions
     { id: 'action-rocky', label: 'Ask Rocky', section: 'Actions', action: () => setRockyOpen(true) },
