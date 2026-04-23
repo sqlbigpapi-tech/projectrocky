@@ -97,6 +97,13 @@ export default function CashFlowTab() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Drill-down filter (clicked category or merchant)
+  type Filter = { kind: 'category' | 'merchant'; value: string } | null;
+  const [filter, setFilter] = useState<Filter>(null);
+  const [filteredTx, setFilteredTx] = useState<Transaction[] | null>(null);
+  const [filteredTotal, setFilteredTotal] = useState<number>(0);
+  const [filterLoading, setFilterLoading] = useState(false);
+
   function fetchData(y: number, m: number | null) {
     setLoading(true);
     let url = `/api/cashflow?year=${y}`;
@@ -111,6 +118,23 @@ export default function CashFlowTab() {
   useEffect(() => {
     fetchData(year, month);
   }, [year, month]);
+
+  useEffect(() => {
+    if (!filter) { setFilteredTx(null); return; }
+    setFilterLoading(true);
+    const params = new URLSearchParams({ year: String(year), limit: '200' });
+    if (month != null) params.set('month', String(month));
+    if (filter.kind === 'category') params.set('category', filter.value);
+    else params.set('merchant', filter.value);
+    fetch(`/api/transactions?${params.toString()}`)
+      .then(r => r.json())
+      .then(d => {
+        setFilteredTx(d.transactions ?? []);
+        setFilteredTotal(d.total ?? 0);
+      })
+      .catch(() => { setFilteredTx([]); setFilteredTotal(0); })
+      .finally(() => setFilterLoading(false));
+  }, [filter, year, month]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -184,6 +208,23 @@ export default function CashFlowTab() {
         </div>
       </div>
 
+      {/* Active drill-down filter chip */}
+      {filter && (
+        <div className="flex items-center gap-2 -mt-2">
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Filtered by</span>
+          <span className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1">
+            <span className="text-[10px] font-mono text-amber-400/70 uppercase">{filter.kind}</span>
+            <span className="text-xs font-mono text-amber-400 font-bold">{filter.value}</span>
+            <button onClick={() => setFilter(null)} className="text-amber-400/60 hover:text-amber-300 text-xs ml-1">✕</button>
+          </span>
+          {filteredTx && (
+            <span className="text-[11px] font-mono text-zinc-500">
+              {filteredTx.length} txns · {fmt(filteredTotal)}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Section 1: Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Total Income */}
@@ -250,14 +291,20 @@ export default function CashFlowTab() {
           )}
         </div>
 
-        {/* Spending by Category */}
+        {/* Spending by Category — click to filter */}
         <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
           <h3 className="text-xs font-bold text-zinc-400 font-mono uppercase tracking-wider mb-4">Spending by Category</h3>
           {sortedCategories.length > 0 ? (
-            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
               {sortedCategories.map((cat, i) => (
-                <div key={cat.category} className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-zinc-400 w-28 truncate shrink-0" title={cat.category}>
+                <button
+                  key={cat.category}
+                  onClick={() => setFilter({ kind: 'category', value: cat.category })}
+                  className={`w-full flex items-center gap-2 rounded px-1 py-1 transition hover:bg-zinc-800/60 ${
+                    filter?.kind === 'category' && filter.value === cat.category ? 'bg-amber-500/10' : ''
+                  }`}
+                >
+                  <span className="text-[11px] font-mono text-zinc-400 w-28 truncate shrink-0 text-left" title={cat.category}>
                     {cat.category}
                   </span>
                   <div className="flex-1 h-5 bg-zinc-800 rounded overflow-hidden">
@@ -272,7 +319,7 @@ export default function CashFlowTab() {
                   <span className="text-[11px] font-mono text-zinc-300 w-16 text-right shrink-0">
                     {fmt(cat.total, true)}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -298,7 +345,13 @@ export default function CashFlowTab() {
                 </thead>
                 <tbody>
                   {top_merchants.map((m, i) => (
-                    <tr key={i} className="border-t border-[var(--border)]/50">
+                    <tr
+                      key={i}
+                      onClick={() => setFilter({ kind: 'merchant', value: m.name })}
+                      className={`border-t border-[var(--border)]/50 cursor-pointer transition hover:bg-zinc-800/60 ${
+                        filter?.kind === 'merchant' && filter.value === m.name ? 'bg-amber-500/10' : ''
+                      }`}
+                    >
                       <td className="py-1.5 text-zinc-300 truncate max-w-[180px]" title={m.name}>{m.name}</td>
                       <td className="py-1.5 text-right text-red-400">{fmt(m.total, true)}</td>
                       <td className="py-1.5 text-right text-zinc-500">{m.count}</td>
@@ -312,13 +365,48 @@ export default function CashFlowTab() {
           )}
         </div>
 
-        {/* Recent Transactions (only if month selected) */}
+        {/* Transactions — shows filtered results when drill-down is active, else month view */}
         <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
           <h3 className="text-xs font-bold text-zinc-400 font-mono uppercase tracking-wider mb-3">
-            {month != null ? `${MONTHS[month - 1]} Transactions` : 'Recent Transactions'}
+            {filter
+              ? `${filter.kind === 'category' ? 'Category' : 'Merchant'}: ${filter.value}`
+              : month != null ? `${MONTHS[month - 1]} Transactions` : 'Recent Transactions'}
           </h3>
-          {month == null ? (
-            <p className="text-zinc-600 text-xs font-mono text-center py-8">Select a month to view transactions</p>
+          {filter ? (
+            filterLoading ? (
+              <p className="text-zinc-600 text-xs font-mono text-center py-8">Loading…</p>
+            ) : (filteredTx ?? []).length > 0 ? (
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full text-xs font-mono">
+                  <thead className="sticky top-0 bg-zinc-900">
+                    <tr className="text-zinc-600">
+                      <th className="text-left py-1.5 font-medium">Date</th>
+                      <th className="text-left py-1.5 font-medium">Name</th>
+                      <th className="text-right py-1.5 font-medium">Amount</th>
+                      <th className="text-left py-1.5 font-medium">Account</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(filteredTx ?? []).map((t, i) => (
+                      <tr key={i} className="border-t border-[var(--border)]/50">
+                        <td className="py-1.5 text-zinc-500 whitespace-nowrap">
+                          {new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </td>
+                        <td className="py-1.5 text-zinc-300 truncate max-w-[140px]" title={t.name}>{t.name}</td>
+                        <td className={`py-1.5 text-right ${t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {fmt(t.amount)}
+                        </td>
+                        <td className="py-1.5 text-zinc-600 truncate max-w-[100px]" title={t.account}>{t.account}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-zinc-600 text-xs font-mono text-center py-8">No transactions match this filter.</p>
+            )
+          ) : month == null ? (
+            <p className="text-zinc-600 text-xs font-mono text-center py-8">Click a category or merchant to drill in — or pick a month.</p>
           ) : recent.length > 0 ? (
             <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
               <table className="w-full text-xs font-mono">

@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
 type Category = 'business' | 'depository' | 'retirement' | 'credit_card' | 'auto_loan' | 'personal_loan';
@@ -187,13 +187,6 @@ export default function NetWorthTab() {
     trajectoryData.push({ date: 'Today', netWorth: calcTotals(DEFAULT_ACCOUNTS).netWorth });
   }
 
-  // Breakdown bar data
-  const breakdownData: { name: string; value: number; color: string }[] = [
-    { name: 'Business Equity',        value: catTotal(current, 'business'),   color: CAT_COLORS.business   },
-    { name: 'Depository',             value: catTotal(current, 'depository'),  color: CAT_COLORS.depository },
-    { name: 'Retirement & Inv.',      value: catTotal(current, 'retirement'),  color: CAT_COLORS.retirement },
-  ];
-
   async function saveSnapshot() {
     setSaving(true);
     try {
@@ -297,46 +290,146 @@ export default function NetWorthTab() {
         ))}
       </div>
 
-      {/* ── Charts row ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Net Worth Trajectory (full width) ── */}
+      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
+        <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Net Worth Trajectory</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={trajectoryData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+            <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={v => fmt(v, true)} tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
+            <Tooltip
+              contentStyle={{ background: '#09090b', border: '1px solid #27272a', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: '#a1a1aa' }}
+              formatter={(v: unknown) => [fmt(Number(v)), 'Net Worth']}
+            />
+            <Line type="monotone" dataKey="netWorth" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-        {/* Net Worth Trajectory */}
-        <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Net Worth Trajectory</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={trajectoryData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="date" tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => fmt(v, true)} tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
-              <Tooltip
-                contentStyle={{ background: '#09090b', border: '1px solid #27272a', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#a1a1aa' }}
-                formatter={(v: unknown) => [fmt(Number(v)), 'Net Worth']}
-              />
-              <Line type="monotone" dataKey="netWorth" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
+      {/* ── AI Recommendations (moved up) ── */}
+      <div className="bg-[var(--card)] rounded-xl border border-violet-500/20 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs text-violet-400 font-mono uppercase tracking-widest">✦ AI Recommendations</p>
+            {recsGeneratedAt && (
+              <p className="text-xs text-zinc-700 font-mono mt-0.5">
+                Last generated {new Date(recsGeneratedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAssumptions(v => !v)}
+              className="px-3 py-2 rounded-xl text-xs font-mono text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
+            >
+              {showAssumptions ? 'Hide' : 'Assumptions'}
+            </button>
+            <button
+              onClick={getRecommendations}
+              disabled={recsLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {recsLoading ? (
+                <>
+                  <span className="w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+                  Analyzing…
+                </>
+              ) : (
+                <>{recs.length > 0 ? 'Refresh' : 'Get Recommendations'}</>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Asset Breakdown */}
-        <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
-          <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-4">Asset Breakdown</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={breakdownData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis dataKey="name" tick={{ fill: '#52525b', fontSize: 9, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => fmt(v, true)} tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} width={60} />
-              <Tooltip
-                contentStyle={{ background: '#09090b', border: '1px solid #27272a', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#a1a1aa' }}
-                formatter={(v: unknown) => [fmt(Number(v)), 'Balance']}
+        {showAssumptions && (
+          <div className="mb-5 p-4 rounded-xl border border-zinc-700 bg-[var(--card)]/50 space-y-3">
+            <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Context sent to AI</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-500 font-mono mb-1 block">Age</label>
+                <input
+                  type="number"
+                  value={assumptions.age}
+                  onChange={e => setAssumptions(p => ({ ...p, age: e.target.value }))}
+                  className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 font-mono mb-1 block">Base Salary</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    value={assumptions.salary}
+                    onChange={e => setAssumptions(p => ({ ...p, salary: e.target.value }))}
+                    className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-violet-500/50 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 font-mono mb-1 block">Role / Title</label>
+              <input
+                type="text"
+                value={assumptions.role}
+                onChange={e => setAssumptions(p => ({ ...p, role: e.target.value }))}
+                className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white focus:outline-none focus:border-violet-500/50 transition-colors"
               />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {breakdownData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 font-mono mb-1 block">Additional Context</label>
+              <textarea
+                rows={3}
+                value={assumptions.notes}
+                onChange={e => setAssumptions(p => ({ ...p, notes: e.target.value }))}
+                placeholder="E.g. planning to sell SEI stake in 3 years, spouse also employed, targeting early retirement at 55..."
+                className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white resize-none placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={saveAssumptions}
+                disabled={assumptionsSaving}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold font-mono tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
+              >
+                {assumptionsSaving ? 'Saving…' : 'Save Assumptions'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {recsError && <p className="text-sm text-red-400 font-mono">{recsError}</p>}
+
+        {recs.length === 0 && !recsLoading && !recsError && (
+          <p className="text-sm text-zinc-600 font-mono">Hit the button for a fresh read on your numbers.</p>
+        )}
+
+        {recs.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {recs.map((r, i) => {
+              const priorityStyles = {
+                high:   { border: 'border-red-500/30',   bg: 'bg-red-500/5',   badge: 'bg-red-500/20 text-red-400',   dot: 'bg-red-400'   },
+                medium: { border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/20 text-amber-400', dot: 'bg-amber-400' },
+                low:    { border: 'border-green-500/30', bg: 'bg-green-500/5', badge: 'bg-green-500/20 text-green-400', dot: 'bg-green-400' },
+              };
+              const s = priorityStyles[r.priority as keyof typeof priorityStyles] ?? priorityStyles.low;
+              return (
+                <div key={i} className={`rounded-xl border ${s.border} ${s.bg} p-4`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400">{r.category}</p>
+                    <span className={`flex items-center gap-1.5 text-xs font-bold font-mono px-2 py-0.5 rounded-full ${s.badge}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {r.priority.toUpperCase()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-zinc-200 leading-relaxed">{r.recommendation}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Account Breakdown ── */}
@@ -548,133 +641,6 @@ export default function NetWorthTab() {
           </div>
         </div>
       )}
-
-      {/* ── AI Recommendations ── */}
-      <div className="bg-[var(--card)] rounded-xl border border-zinc-800 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest">AI Recommendations</p>
-            {recsGeneratedAt && (
-              <p className="text-xs text-zinc-700 font-mono mt-0.5">
-                Last generated {new Date(recsGeneratedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAssumptions(v => !v)}
-              className="px-3 py-2 rounded-xl text-xs font-mono text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
-            >
-              {showAssumptions ? 'Hide' : 'Assumptions'}
-            </button>
-            <button
-              onClick={getRecommendations}
-              disabled={recsLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {recsLoading ? (
-                <>
-                  <span className="w-3 h-3 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
-                  Analyzing…
-                </>
-              ) : (
-                <>✦ Get AI Recommendations</>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Assumptions editor */}
-        {showAssumptions && (
-          <div className="mb-5 p-4 rounded-xl border border-zinc-700 bg-[var(--card)]/50 space-y-3">
-            <p className="text-xs text-zinc-500 font-mono uppercase tracking-widest mb-1">Context sent to AI</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-500 font-mono mb-1 block">Age</label>
-                <input
-                  type="number"
-                  value={assumptions.age}
-                  onChange={e => setAssumptions(p => ({ ...p, age: e.target.value }))}
-                  className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono focus:outline-none focus:border-violet-500/50 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-500 font-mono mb-1 block">Base Salary</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
-                  <input
-                    type="number"
-                    value={assumptions.salary}
-                    onChange={e => setAssumptions(p => ({ ...p, salary: e.target.value }))}
-                    className="w-full pl-7 pr-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white font-mono tabular-nums focus:outline-none focus:border-violet-500/50 transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-zinc-500 font-mono mb-1 block">Role / Title</label>
-              <input
-                type="text"
-                value={assumptions.role}
-                onChange={e => setAssumptions(p => ({ ...p, role: e.target.value }))}
-                className="w-full px-3 py-1.5 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white focus:outline-none focus:border-violet-500/50 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-500 font-mono mb-1 block">Additional Context</label>
-              <textarea
-                rows={3}
-                value={assumptions.notes}
-                onChange={e => setAssumptions(p => ({ ...p, notes: e.target.value }))}
-                placeholder="E.g. planning to sell SEI stake in 3 years, spouse also employed, targeting early retirement at 55..."
-                className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-zinc-700 text-sm text-white resize-none placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
-              />
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={saveAssumptions}
-                disabled={assumptionsSaving}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold font-mono tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
-              >
-                {assumptionsSaving ? 'Saving…' : 'Save Assumptions'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {recsError && (
-          <p className="text-sm text-red-400 font-mono">{recsError}</p>
-        )}
-
-        {recs.length === 0 && !recsLoading && !recsError && (
-          <p className="text-sm text-zinc-600 font-mono">Hit the button to get a fresh read on your numbers.</p>
-        )}
-
-        {recs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recs.map((r, i) => {
-              const priorityStyles = {
-                high:   { border: 'border-red-500/30',   bg: 'bg-red-500/5',   badge: 'bg-red-500/20 text-red-400',   dot: 'bg-red-400'   },
-                medium: { border: 'border-amber-500/30', bg: 'bg-amber-500/5', badge: 'bg-amber-500/20 text-amber-400', dot: 'bg-amber-400' },
-                low:    { border: 'border-green-500/30', bg: 'bg-green-500/5', badge: 'bg-green-500/20 text-green-400', dot: 'bg-green-400' },
-              };
-              const s = priorityStyles[r.priority as keyof typeof priorityStyles] ?? priorityStyles.low;
-              return (
-                <div key={i} className={`rounded-xl border ${s.border} ${s.bg} p-4`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400">{r.category}</p>
-                    <span className={`flex items-center gap-1.5 text-xs font-bold font-mono px-2 py-0.5 rounded-full ${s.badge}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                      {r.priority.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-200 leading-relaxed">{r.recommendation}</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
     </div>
   );
