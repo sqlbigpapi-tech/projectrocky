@@ -23,6 +23,8 @@ type LeaderPlayer = {
   name: string;
   stat: string;
   teamAbbr: string;
+  headshot: string | null;
+  position: string | null;
 };
 
 type LeaderCategory = {
@@ -141,6 +143,8 @@ export async function GET(request: Request) {
           name: str(top?.athlete?.displayName),
           stat: str(top?.displayValue),
           teamAbbr: abbr,
+          headshot: str(top?.athlete?.headshot?.href) || null,
+          position: str(top?.athlete?.position?.abbreviation) || null,
         };
         if (!byCategory[catName]) byCategory[catName] = [];
         byCategory[catName].push(player);

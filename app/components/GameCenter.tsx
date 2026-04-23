@@ -19,7 +19,7 @@ type ScoringPlay = {
   homeScore: string;
   awayScore: string;
 };
-type LeaderPlayer = { name: string; stat: string; teamAbbr: string };
+type LeaderPlayer = { name: string; stat: string; teamAbbr: string; headshot: string | null; position: string | null };
 type LeaderCategory = { category: string; players: LeaderPlayer[] };
 type WinProbPoint = { play: number; homePct: number };
 type LineScore = {
@@ -343,17 +343,31 @@ export default function GameCenter({
               {/* Leaders */}
               {summary.leaders.length > 0 && (
                 <div className="px-5 py-4">
-                  <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2.5">Leaders</p>
-                  <div className="space-y-1.5">
+                  <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-3">Leaders</p>
+                  <div className="space-y-3">
                     {summary.leaders.slice(0, 4).map(cat => (
-                      <div key={cat.category} className="flex items-center gap-3 text-xs">
-                        <span className="w-20 text-zinc-500 font-mono uppercase tracking-wider text-[10px] shrink-0">{cat.category}</span>
-                        <div className="flex-1 flex flex-wrap gap-x-4 gap-y-0.5">
+                      <div key={cat.category}>
+                        <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1.5">{cat.category}</p>
+                        <div className="grid grid-cols-2 gap-2">
                           {cat.players.map((p, i) => (
-                            <span key={i} className="text-zinc-300">
-                              <span className="text-zinc-500 font-mono mr-1">{p.teamAbbr}</span>
-                              {p.name} <span className="text-zinc-500 font-mono tabular-nums">{p.stat}</span>
-                            </span>
+                            <div key={i} className="flex items-center gap-2.5 bg-zinc-900/50 border border-zinc-800 rounded-lg px-2.5 py-2">
+                              {p.headshot ? (
+                                <div className="w-10 h-10 relative shrink-0 rounded-full overflow-hidden bg-zinc-800">
+                                  <Image src={p.headshot} alt={p.name} fill className="object-cover" unoptimized />
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 shrink-0 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[9px] font-mono text-zinc-500">
+                                  {p.teamAbbr.slice(0, 3)}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-white font-bold truncate">{p.name}</p>
+                                <p className="text-[10px] text-zinc-500 font-mono">
+                                  {p.teamAbbr}{p.position ? ` · ${p.position}` : ''}
+                                </p>
+                              </div>
+                              <p className="text-sm text-white font-bold font-mono tabular-nums shrink-0">{p.stat}</p>
+                            </div>
                           ))}
                         </div>
                       </div>

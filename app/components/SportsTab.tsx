@@ -12,6 +12,8 @@ type GameInfo = {
   opponent: string;
   opponentAbbr: string;
   opponentLogo: string;
+  opponentColor: string | null;
+  opponentAltColor: string | null;
   homeAway: string;
   teamScore: string;
   opponentScore: string;
@@ -455,6 +457,123 @@ function AddTeamPanel({ followed, onAdd, onClose }: {
 
 function feedKey(f: FollowedTeam) { return `${f.league}-${f.teamId}`; }
 
+function LiveGameHero({ feed, onOpenGame }: { feed: TeamFeed; onOpenGame: (t: GameCenterTarget) => void }) {
+  const live = feed.liveGame!;
+  const isHome = live.homeAway === 'home';
+  const userColor = hexColor(feed.team.color) ?? hexColor(feed.team.altColor);
+  const oppColor = hexColor(live.opponentColor) ?? hexColor(live.opponentAltColor);
+
+  // Conventional scoreboard: away on left, home on right
+  const awayAbbr = isHome ? live.opponentAbbr : feed.team.abbr;
+  const awayLogo = isHome ? live.opponentLogo : feed.team.logo;
+  const awayScore = isHome ? live.opponentScore : live.teamScore;
+  const awayColor = isHome ? oppColor : userColor;
+
+  const homeAbbr = isHome ? feed.team.abbr : live.opponentAbbr;
+  const homeLogo = isHome ? feed.team.logo : live.opponentLogo;
+  const homeScore = isHome ? live.teamScore : live.opponentScore;
+  const homeColor = isHome ? userColor : oppColor;
+
+  const leftCol = awayColor ?? '#3f3f46';
+  const rightCol = homeColor ?? '#3f3f46';
+  const gradient = `linear-gradient(90deg, ${leftCol}66 0%, ${leftCol}22 28%, #0a0a0a 50%, ${rightCol}22 72%, ${rightCol}66 100%)`;
+
+  const leagueLower = feed.team.league.toLowerCase();
+  const sportForLeague =
+    leagueLower === 'nfl' || leagueLower === 'ncaaf' ? 'football'
+      : leagueLower === 'nba' ? 'basketball'
+      : leagueLower === 'mlb' ? 'baseball'
+      : 'football';
+  const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
+
+  return (
+    <button
+      onClick={() => live.id && onOpenGame({ sport: sportForLeague, league: apiLeague, eventId: live.id })}
+      className="w-full rounded-2xl border border-green-500/40 overflow-hidden relative group text-left"
+      style={{ background: gradient }}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.4)_100%)]" />
+
+      <div className="relative px-5 md:px-8 py-5 md:py-6">
+        {/* Top bar: LIVE indicator + status + click hint */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="relative flex items-center justify-center">
+              <span className="absolute w-2.5 h-2.5 rounded-full bg-green-400 animate-ping" />
+              <span className="relative w-2 h-2 rounded-full bg-green-400" />
+            </span>
+            <span className="text-[11px] font-bold font-mono text-green-400 uppercase tracking-[0.3em]">
+              Live · {live.statusDetail}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-300 transition uppercase tracking-widest">
+            Gamecenter →
+          </span>
+        </div>
+
+        {/* Matchup with massive score */}
+        <div className="flex items-center justify-between gap-3 md:gap-6">
+          {/* Away */}
+          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+            {awayLogo ? (
+              <div className="w-16 h-16 md:w-24 md:h-24 relative drop-shadow-2xl">
+                <Image src={awayLogo} alt={awayAbbr} fill className="object-contain" unoptimized />
+              </div>
+            ) : (
+              <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-zinc-800/60 flex items-center justify-center font-mono font-bold text-zinc-400">
+                {awayAbbr}
+              </div>
+            )}
+            <p className="text-[11px] md:text-xs font-bold font-mono tracking-[0.2em] text-zinc-200">{awayAbbr}</p>
+            <p className="text-4xl md:text-6xl font-bold tabular-nums text-white leading-none mt-0.5">
+              {awayScore || '0'}
+            </p>
+          </div>
+
+          {/* Center divider */}
+          <div className="flex flex-col items-center gap-1 shrink-0 pb-6 md:pb-10">
+            <span className="text-xs md:text-sm font-bold font-mono text-zinc-600 tracking-widest">VS</span>
+          </div>
+
+          {/* Home */}
+          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+            {homeLogo ? (
+              <div className="w-16 h-16 md:w-24 md:h-24 relative drop-shadow-2xl">
+                <Image src={homeLogo} alt={homeAbbr} fill className="object-contain" unoptimized />
+              </div>
+            ) : (
+              <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-zinc-800/60 flex items-center justify-center font-mono font-bold text-zinc-400">
+                {homeAbbr}
+              </div>
+            )}
+            <p className="text-[11px] md:text-xs font-bold font-mono tracking-[0.2em] text-zinc-200">{homeAbbr}</p>
+            <p className="text-4xl md:text-6xl font-bold tabular-nums text-white leading-none mt-0.5">
+              {homeScore || '0'}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer: team name tag */}
+        <p className="text-center text-[10px] font-mono text-zinc-500 mt-4 uppercase tracking-widest">
+          {feed.team.name} · {feed.team.league}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function LiveWarRoom({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | null>; onOpenGame: (t: GameCenterTarget) => void }) {
+  const liveFeeds = Object.values(feeds).filter((f): f is TeamFeed => !!f && !!f.liveGame);
+  if (liveFeeds.length === 0) return null;
+  return (
+    <div className="space-y-3 mb-4">
+      {liveFeeds.map(feed => (
+        <LiveGameHero key={feed.team.id} feed={feed} onOpenGame={onOpenGame} />
+      ))}
+    </div>
+  );
+}
+
 function TonightStrip({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | null>; onOpenGame: (t: GameCenterTarget) => void }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -589,6 +708,25 @@ export default function SportsTab() {
     }
   }, [followed, mounted]);
 
+  // War Room polling — refresh feeds for teams with a live game every 30s
+  useEffect(() => {
+    const liveKeys = Object.entries(feeds)
+      .filter(([, f]) => f?.liveGame)
+      .map(([k]) => k);
+    if (liveKeys.length === 0) return;
+    const id = setInterval(() => {
+      for (const key of liveKeys) {
+        const team = followed.find(f => feedKey(f) === key);
+        if (!team) continue;
+        fetch(`/api/team-feed?sport=${team.sport}&league=${team.league}&teamId=${team.teamId}`)
+          .then(r => r.json())
+          .then(d => { if (!d.error) setFeeds(prev => ({ ...prev, [key]: d })); })
+          .catch(() => {});
+      }
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [feeds, followed]);
+
   function save(teams: FollowedTeam[]) {
     setFollowed(teams);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(teams));
@@ -616,6 +754,8 @@ export default function SportsTab() {
           + Follow Team
         </button>
       </div>
+
+      <LiveWarRoom feeds={feeds} onOpenGame={setGcTarget} />
 
       <TonightStrip feeds={feeds} onOpenGame={setGcTarget} />
 

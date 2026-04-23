@@ -97,6 +97,8 @@ export async function GET(request: Request) {
         opponent: str(oppComp?.team?.displayName),
         opponentAbbr: str(oppComp?.team?.abbreviation),
         opponentLogo: str(oppComp?.team?.logo ?? oppComp?.team?.logos?.[0]?.href),
+        opponentColor: str(oppComp?.team?.color) || null,
+        opponentAltColor: str(oppComp?.team?.alternateColor) || null,
         homeAway: str(ourComp?.homeAway) || 'home',
         teamScore: str(ourComp?.score),
         opponentScore: str(oppComp?.score),
