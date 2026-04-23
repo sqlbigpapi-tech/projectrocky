@@ -786,36 +786,73 @@ export default function NetWorthTab() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {categories.map(cat => {
-            const accounts = current.filter(a => a.category === cat);
-            const total = accounts.reduce((s, a) => s + a.balance, 0);
-            const isLiability = LIABILITY_CATS.includes(cat);
-            return (
-              <div key={cat}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: CAT_COLORS[cat] }}>
-                    {CAT_LABELS[cat]}
-                  </p>
-                  <p className={`text-sm font-bold tabular-nums ${isLiability ? 'text-red-400' : 'text-zinc-300'}`}>{fmt(total)}</p>
-                </div>
-                <div className="space-y-1.5">
-                  {accounts.map(a => (
-                    <div key={a.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--card)]/50 border border-zinc-800">
-                      <div className="flex items-center gap-2">
-                        {a.priority && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Pay first" />}
-                        <p className="text-sm text-zinc-300">{a.name}</p>
-                      </div>
-                      <p className={`text-sm font-mono tabular-nums font-medium ${isLiability ? 'text-red-400/80' : 'text-zinc-200'}`}>
-                        {fmt(a.balance)}
+        {(() => {
+          // Previous snapshot for delta calculations
+          const prev = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
+          const prevById = new Map<string, number>();
+          if (prev) for (const a of prev.accounts) prevById.set(a.id, a.balance);
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {categories.map(cat => {
+                const accounts = current
+                  .filter(a => a.category === cat)
+                  .sort((a, b) => b.balance - a.balance);
+                const total = accounts.reduce((s, a) => s + a.balance, 0);
+                const isLiability = LIABILITY_CATS.includes(cat);
+                const catColor = CAT_COLORS[cat];
+                const maxBal = Math.max(...accounts.map(a => a.balance), 1);
+                return (
+                  <div key={cat}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: catColor }}>
+                        {CAT_LABELS[cat]}
                       </p>
+                      <p className={`text-sm font-bold tabular-nums ${isLiability ? 'text-red-400' : 'text-zinc-300'}`}>{fmt(total)}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    <div className="space-y-1">
+                      {accounts.map(a => {
+                        const prevBal = prevById.get(a.id);
+                        const delta = prevBal != null ? a.balance - prevBal : null;
+                        const zeroLiability = isLiability && a.balance === 0;
+                        const widthPct = total > 0 ? Math.max(2, (a.balance / maxBal) * 100) : 0;
+                        return (
+                          <div
+                            key={a.id}
+                            className={`relative px-3 py-2 rounded-lg bg-[var(--card)]/50 border border-zinc-800 overflow-hidden ${zeroLiability ? 'opacity-40' : ''}`}
+                          >
+                            {/* Weight bar — subtle color fill */}
+                            {a.balance > 0 && (
+                              <div
+                                className="absolute inset-y-0 left-0 opacity-[0.08] pointer-events-none"
+                                style={{ width: `${widthPct}%`, background: catColor }}
+                              />
+                            )}
+                            <div className="relative flex items-center justify-between gap-3">
+                              <p className="text-sm text-zinc-300 truncate flex-1">{a.name}</p>
+                              <div className="text-right shrink-0">
+                                <p className={`text-sm font-mono tabular-nums font-medium ${isLiability ? 'text-red-400/80' : 'text-zinc-200'}`}>
+                                  {fmt(a.balance)}
+                                </p>
+                                {delta != null && delta !== 0 && (
+                                  <p className={`text-[10px] font-mono tabular-nums ${
+                                    (isLiability ? delta < 0 : delta > 0) ? 'text-emerald-400' : 'text-red-400'
+                                  }`}>
+                                    {delta > 0 ? '+' : ''}{fmt(delta, true)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Update Form ── */}
