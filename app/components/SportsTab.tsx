@@ -32,6 +32,7 @@ type TeamFeed = {
   liveGame: GameInfo | null;
   lastGame: GameInfo | null;
   nextGame: GameInfo | null;
+  upcoming?: GameInfo[];
   last5: ('W' | 'L')[];
   news: NewsItem[];
   standings: Standings | null;
@@ -120,9 +121,72 @@ function FormPips({ last5 }: { last5: ('W' | 'L')[] }) {
   );
 }
 
-function TeamCard({ feed, loading, onRemove, onOpenGame }: {
+function CompactTeamRow({ feed, storyline, onRemove, onOpenGame }: {
+  feed: TeamFeed;
+  storyline?: string;
+  onRemove: () => void;
+  onOpenGame: (target: GameCenterTarget) => void;
+}) {
+  const accent = hexColor(feed.team.color) ?? hexColor(feed.team.altColor);
+  const next = feed.nextGame;
+  const daysUntil = next ? Math.ceil((new Date(next.date).getTime() - Date.now()) / 86400000) : null;
+  const leagueLower = feed.team.league.toLowerCase();
+  const sportForLeague =
+    leagueLower === 'nfl' || leagueLower === 'ncaaf' ? 'football'
+      : leagueLower === 'nba' ? 'basketball'
+      : leagueLower === 'mlb' ? 'baseball'
+      : 'football';
+  const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
+  return (
+    <div
+      className="bg-[var(--card)] border border-zinc-800 border-l-4 rounded-xl px-4 py-3 group flex items-center gap-3"
+      style={accent ? { borderLeftColor: accent } : undefined}
+    >
+      {feed.team.logo && (
+        <div className="w-9 h-9 relative shrink-0">
+          <Image src={feed.team.logo} alt={feed.team.abbr} fill className="object-contain" unoptimized />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-bold text-white">{feed.team.abbr}</p>
+          <span className="text-[10px] font-mono text-zinc-500">{feed.team.league}</span>
+          {feed.team.record && <span className="text-[10px] font-mono text-zinc-400">{feed.team.record}</span>}
+          {feed.last5.length > 0 && (
+            <span className="flex items-center gap-0.5">
+              {feed.last5.map((r, i) => (
+                <span key={i} className={`w-1.5 h-1.5 rounded-full ${r === 'W' ? 'bg-emerald-400' : 'bg-red-400/70'}`} />
+              ))}
+            </span>
+          )}
+        </div>
+        {storyline && <p className="text-[11px] text-zinc-500 italic line-clamp-1 mt-0.5">{storyline}</p>}
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        {next && daysUntil != null && (
+          <button
+            onClick={() => next.id && onOpenGame({ sport: sportForLeague, league: apiLeague, eventId: next.id })}
+            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
+          >
+            <span className="text-[10px] font-mono text-zinc-600">in {daysUntil}d</span>
+            {next.opponentLogo && (
+              <div className="w-4 h-4 relative">
+                <Image src={next.opponentLogo} alt={next.opponentAbbr} fill className="object-contain" unoptimized />
+              </div>
+            )}
+            <span className="text-[11px] font-mono">{next.homeAway === 'home' ? 'vs' : '@'} {next.opponentAbbr}</span>
+          </button>
+        )}
+        <button onClick={onRemove} className="text-zinc-700 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition">✕</button>
+      </div>
+    </div>
+  );
+}
+
+function TeamCard({ feed, loading, storyline, onRemove, onOpenGame }: {
   feed: TeamFeed | null;
   loading: boolean;
+  storyline?: string;
   onRemove: () => void;
   onOpenGame: (target: GameCenterTarget) => void;
 }) {
@@ -215,6 +279,11 @@ function TeamCard({ feed, loading, onRemove, onOpenGame }: {
             </div>
           </div>
         </div>
+        {storyline && (
+          <p className="text-[12px] text-zinc-400 italic mt-3 leading-snug border-l-2 border-zinc-700 pl-2.5">
+            {storyline}
+          </p>
+        )}
       </div>
 
       <div className="divide-y divide-zinc-800/60">
@@ -670,6 +739,152 @@ function TonightStrip({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | 
   );
 }
 
+function MorningBrief({ brief, loading }: { brief: string[]; loading: boolean }) {
+  const hour = new Date().getHours();
+  const label = hour < 11 ? 'Morning Desk' : hour < 17 ? 'Afternoon Desk' : hour < 22 ? 'Evening Desk' : 'Late Desk';
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-zinc-800 bg-[var(--card)] p-5">
+        <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-amber-400 mb-3">Rocky's {label}</p>
+        <div className="space-y-2">
+          <div className="skeleton h-3 w-full rounded" />
+          <div className="skeleton h-3 w-[92%] rounded" />
+          <div className="skeleton h-3 w-[78%] rounded" />
+        </div>
+      </div>
+    );
+  }
+  if (brief.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-amber-500/[0.04] via-transparent to-transparent p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[11px] font-bold font-mono uppercase tracking-widest text-amber-400">Rocky's {label}</span>
+        <div className="flex-1 h-px bg-zinc-800/60" />
+      </div>
+      <div className="space-y-2.5">
+        {brief.map((p, i) => (
+          <p key={i} className="text-sm text-zinc-300 leading-relaxed">{p}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WeekView({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | null>; onOpenGame: (t: GameCenterTarget) => void }) {
+  const activeFeeds = Object.values(feeds).filter((f): f is TeamFeed => !!f);
+  if (activeFeeds.length === 0) return null;
+
+  // Build 14-day columns starting today (ET)
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  today.setHours(0, 0, 0, 0);
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    return d;
+  });
+
+  const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayShort = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1);
+  const dayNum = (d: Date) => d.getDate();
+  const isToday = (d: Date) => dayKey(d) === dayKey(today);
+
+  // For each team, map day -> game
+  type CellGame = { feed: TeamFeed; game: GameInfo };
+  const byTeamByDay: Map<string, Map<string, CellGame>> = new Map();
+  for (const feed of activeFeeds) {
+    const games = [...(feed.upcoming ?? []), feed.liveGame].filter((g): g is GameInfo => !!g);
+    const map = new Map<string, CellGame>();
+    for (const g of games) {
+      const k = g.date.slice(0, 10); // YYYY-MM-DD
+      if (!map.has(k)) map.set(k, { feed, game: g });
+    }
+    byTeamByDay.set(feed.team.id, map);
+  }
+
+  function openGame(feed: TeamFeed, g: GameInfo) {
+    if (!g.id) return;
+    const leagueLower = feed.team.league.toLowerCase();
+    const sportForLeague =
+      leagueLower === 'nfl' || leagueLower === 'ncaaf' ? 'football'
+        : leagueLower === 'nba' ? 'basketball'
+        : leagueLower === 'mlb' ? 'baseball'
+        : 'football';
+    const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
+    onOpenGame({ sport: sportForLeague, league: apiLeague, eventId: g.id });
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-[var(--card)] p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-[11px] font-bold font-mono uppercase tracking-widest text-zinc-500">The Week</span>
+        <div className="flex-1 h-px bg-zinc-800/60" />
+        <span className="text-[10px] font-mono text-zinc-600">14 days</span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          {/* Day header */}
+          <div className="grid gap-px" style={{ gridTemplateColumns: '80px repeat(14, minmax(0, 1fr))' }}>
+            <div />
+            {days.map((d, i) => (
+              <div key={i} className={`text-center py-1 ${isToday(d) ? 'bg-amber-500/10 rounded-t' : ''}`}>
+                <p className={`text-[9px] font-mono uppercase ${isToday(d) ? 'text-amber-400' : 'text-zinc-600'}`}>{dayShort(d)}</p>
+                <p className={`text-[11px] font-mono font-bold tabular-nums ${isToday(d) ? 'text-amber-400' : 'text-zinc-400'}`}>{dayNum(d)}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Team rows */}
+          {activeFeeds.map(feed => {
+            const accent = hexColor(feed.team.color) ?? hexColor(feed.team.altColor);
+            const dayMap = byTeamByDay.get(feed.team.id) ?? new Map();
+            return (
+              <div key={feed.team.id} className="grid gap-px items-center py-1 border-t border-zinc-800/40" style={{ gridTemplateColumns: '80px repeat(14, minmax(0, 1fr))' }}>
+                <div className="flex items-center gap-1.5 pr-2">
+                  <span className="w-1 h-6 rounded-full shrink-0" style={{ background: accent ?? '#52525b' }} />
+                  {feed.team.logo && (
+                    <div className="w-5 h-5 relative shrink-0">
+                      <Image src={feed.team.logo} alt={feed.team.abbr} fill className="object-contain" unoptimized />
+                    </div>
+                  )}
+                  <p className="text-[10px] font-mono text-zinc-400 truncate">{feed.team.abbr}</p>
+                </div>
+                {days.map((d, i) => {
+                  const cell = dayMap.get(dayKey(d));
+                  if (!cell) return <div key={i} className={`h-8 rounded ${isToday(d) ? 'bg-amber-500/5' : ''}`} />;
+                  const { game } = cell;
+                  const isLive = feed.liveGame?.id === game.id;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => openGame(feed, game)}
+                      className={`h-8 rounded flex flex-col items-center justify-center transition hover:brightness-125 ${
+                        isLive ? 'bg-green-500/20 border border-green-500/40' : 'bg-zinc-900/60 border border-zinc-800'
+                      } ${isToday(d) ? 'ring-1 ring-amber-500/20' : ''}`}
+                      title={`${game.homeAway === 'home' ? 'vs' : '@'} ${game.opponentAbbr} ${game.date.slice(11, 16)}`}
+                    >
+                      {game.opponentLogo ? (
+                        <div className="w-4 h-4 relative">
+                          <Image src={game.opponentLogo} alt={game.opponentAbbr} fill className="object-contain" unoptimized />
+                        </div>
+                      ) : (
+                        <p className="text-[8px] font-mono font-bold text-zinc-400">{game.opponentAbbr}</p>
+                      )}
+                      <p className={`text-[7px] font-mono leading-none mt-0.5 ${isLive ? 'text-green-400' : 'text-zinc-600'}`}>
+                        {game.homeAway === 'home' ? 'vs' : '@'}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SportsTab() {
   const [followed, setFollowed] = useState<FollowedTeam[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -677,6 +892,9 @@ export default function SportsTab() {
   const [feeds, setFeeds] = useState<Record<string, TeamFeed | null>>({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const [gcTarget, setGcTarget] = useState<GameCenterTarget>(null);
+  const [brief, setBrief] = useState<string[]>([]);
+  const [storylines, setStorylines] = useState<Record<string, string>>({});
+  const [briefLoading, setBriefLoading] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -707,6 +925,29 @@ export default function SportsTab() {
         }));
     }
   }, [followed, mounted]);
+
+  // Morning Brief — fetch once we have at least one feed, whenever the feed set materially changes
+  useEffect(() => {
+    const active = Object.values(feeds).filter((f): f is TeamFeed => !!f);
+    if (active.length === 0) return;
+    const allLoaded = followed.every(f => feeds[feedKey(f)] !== undefined);
+    if (!allLoaded) return;
+    setBriefLoading(true);
+    fetch('/api/sports-brief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeds: active }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.error) {
+          setBrief(d.brief ?? []);
+          setStorylines(d.storylines ?? {});
+        }
+      })
+      .catch(() => {})
+      .finally(() => setBriefLoading(false));
+  }, [feeds, followed]);
 
   // War Room polling — refresh feeds for teams with a live game every 30s
   useEffect(() => {
@@ -757,28 +998,75 @@ export default function SportsTab() {
 
       <LiveWarRoom feeds={feeds} onOpenGame={setGcTarget} />
 
+      {(briefLoading || brief.length > 0) && (
+        <MorningBrief brief={brief} loading={briefLoading} />
+      )}
+
       <TonightStrip feeds={feeds} onOpenGame={setGcTarget} />
 
       {followed.length === 0 ? (
         <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-12 text-center text-zinc-500 text-sm">
           No teams followed yet. Hit "+ Follow Team" to get started.
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {followed.map(f => {
-            const key = feedKey(f);
-            return (
-              <TeamCard
-                key={key}
-                feed={feeds[key] ?? null}
-                loading={loadingKeys.has(key) && feeds[key] === undefined}
-                onRemove={() => removeTeam(f.teamId, f.league)}
-                onOpenGame={setGcTarget}
-              />
-            );
-          })}
-        </div>
-      )}
+      ) : (() => {
+        // Relevance split: teams with a live game OR a next game within 48h get full cards;
+        // the rest collapse to compact rows.
+        const FULL_WINDOW_MS = 48 * 3600 * 1000;
+        const now = Date.now();
+        const ACTIVE: typeof followed = [];
+        const IDLE: typeof followed = [];
+        for (const f of followed) {
+          const key = feedKey(f);
+          const feed = feeds[key];
+          const active = !!feed?.liveGame ||
+            (!!feed?.nextGame && new Date(feed.nextGame.date).getTime() - now <= FULL_WINDOW_MS);
+          (active || !feed ? ACTIVE : IDLE).push(f);
+        }
+        return (
+          <div className="space-y-4">
+            {ACTIVE.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {ACTIVE.map(f => {
+                  const key = feedKey(f);
+                  const feed = feeds[key] ?? null;
+                  const storyKey = feed ? `${feed.team.league.toLowerCase()}-${feed.team.id}` : '';
+                  return (
+                    <TeamCard
+                      key={key}
+                      feed={feed}
+                      loading={loadingKeys.has(key) && feeds[key] === undefined}
+                      storyline={storylines[storyKey]}
+                      onRemove={() => removeTeam(f.teamId, f.league)}
+                      onOpenGame={setGcTarget}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {IDLE.length > 0 && (
+              <div className="space-y-2">
+                {IDLE.map(f => {
+                  const key = feedKey(f);
+                  const feed = feeds[key];
+                  if (!feed) return null;
+                  const storyKey = `${feed.team.league.toLowerCase()}-${feed.team.id}`;
+                  return (
+                    <CompactTeamRow
+                      key={key}
+                      feed={feed}
+                      storyline={storylines[storyKey]}
+                      onRemove={() => removeTeam(f.teamId, f.league)}
+                      onOpenGame={setGcTarget}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      <WeekView feeds={feeds} onOpenGame={setGcTarget} />
 
       {showAdd && (
         <AddTeamPanel

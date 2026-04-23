@@ -144,6 +144,17 @@ export async function GET(request: Request) {
     const nextGame = parseGame(nextEvent);
     if (nextGame && mlbProbables) nextGame.probablePitchers = mlbProbables;
 
+    // Next 14 days of scheduled games (for the Week Gantt view)
+    const nowMs = Date.now();
+    const horizonMs = nowMs + 14 * 86400000;
+    const upcoming = futureGames
+      .filter(e => {
+        const t = new Date(str(e.date)).getTime();
+        return t >= nowMs && t <= horizonMs;
+      })
+      .map(parseGame)
+      .filter((g): g is NonNullable<typeof g> => g !== null);
+
     const news = (newsData.articles ?? [])
       .filter((a: any) => ['Media', 'Recap', 'Story'].includes(a.type))
       .slice(0, 4)
@@ -200,6 +211,7 @@ export async function GET(request: Request) {
       liveGame: parseGame(liveEvent),
       lastGame: parseGame(lastEvent),
       nextGame,
+      upcoming,
       last5,
       news,
       standings,
