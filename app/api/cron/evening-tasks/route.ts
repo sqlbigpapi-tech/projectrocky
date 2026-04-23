@@ -18,7 +18,11 @@ export async function GET(request: Request) {
     .eq('completed', false)
     .not('due_date', 'is', null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Evening cron runs at 00:00 UTC = 8 PM ET, when UTC has already flipped to
+  // the next day. Derive "today" in Eastern time so tasks due today don't get
+  // mislabeled as overdue.
+  const eastern = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const todayStr = `${eastern.getFullYear()}-${String(eastern.getMonth() + 1).padStart(2, '0')}-${String(eastern.getDate()).padStart(2, '0')}`;
   const relevant = (tasks ?? []).filter((t: { due_date: string }) => t.due_date <= todayStr);
 
   if (relevant.length === 0) return NextResponse.json({ sent: false, reason: 'no tasks' });
