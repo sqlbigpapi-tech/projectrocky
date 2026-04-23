@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { useToast } from '../page';
 
 type Category = 'business' | 'depository' | 'retirement' | 'credit_card' | 'auto_loan' | 'personal_loan';
 const LIABILITY_CATS: Category[] = ['credit_card', 'auto_loan', 'personal_loan'];
@@ -93,6 +94,296 @@ function catTotal(accounts: Account[], cat: Category) {
   return accounts.filter(a => a.category === cat).reduce((s, a) => s + a.balance, 0);
 }
 
+type ExtractResult = {
+  results: {
+    extracted: { name: string; balance: number; last4: string | null; section: string | null };
+    match: { id: string; name: string; category: Category; balance: number } | null;
+    score: number;
+    suggested_category: Category;
+  }[];
+  missing: { id: string; name: string; category: Category; current_balance: number }[];
+  totals: {
+    current: { assets: number; liab: number; net: number };
+    proposed: { assets: number; liab: number; net: number; accounts: Account[] };
+  };
+};
+
+function fmtMoney(n: number): string {
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+
+function ExtractModal({ onApply, onClose }: {
+  onApply: (accounts: Account[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const [result, setResult] = useState<ExtractResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Per-row user decision: include or skip. Default include.
+  const [included, setIncluded] = useState<Record<number, boolean>>({});
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<number, Category>>({});
+
+  function handleFiles(list: FileList | null) {
+    if (!list) return;
+    const arr = Array.from(list).filter(f => f.type.startsWith('image/'));
+    setFiles(prev => [...prev, ...arr]);
+  }
+
+  function removeFile(i: number) {
+    setFiles(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function extract() {
+    if (files.length === 0) return;
+    setExtracting(true);
+    setErr(null);
+    try {
+      const form = new FormData();
+      for (const f of files) form.append('images', f);
+      const res = await fetch('/api/net-worth/extract', { method: 'POST', body: form });
+      const d = await res.json();
+      if (d.error) { setErr(d.error); return; }
+      setResult(d);
+      const inc: Record<number, boolean> = {};
+      (d.results as ExtractResult['results']).forEach((_, i) => { inc[i] = true; });
+      setIncluded(inc);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Extraction failed');
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  async function apply() {
+    if (!result) return;
+    setApplying(true);
+    try {
+      // Build final accounts: start with missing (untouched), layer in included updates & new.
+      const final: Account[] = result.missing.map(m => ({
+        id: m.id, name: m.name, category: m.category, balance: m.current_balance,
+      }));
+
+      result.results.forEach((r, i) => {
+        if (!included[i]) return;
+        if (r.match) {
+          // Replace or add a matched account with the new balance
+          const existing = final.find(a => a.id === r.match!.id);
+          if (existing) existing.balance = r.extracted.balance;
+          else final.push({
+            id: r.match.id, name: r.match.name, category: r.match.category, balance: r.extracted.balance,
+          });
+        } else {
+          // New account
+          const id = r.extracted.name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || `new_${i}`;
+          final.push({
+            id,
+            name: r.extracted.name,
+            category: categoryOverrides[i] ?? r.suggested_category,
+            balance: r.extracted.balance,
+          });
+        }
+      });
+
+      await onApply(final);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-0 md:p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-[var(--card)] border border-zinc-800 w-full md:max-w-3xl md:rounded-xl min-h-screen md:min-h-0 md:my-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-[var(--card)] z-10">
+          <p className="text-sm font-bold text-white">Update Balances from Screenshots</p>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white transition">✕</button>
+        </div>
+
+        {!result && (
+          <div className="px-5 py-5 space-y-4">
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Drop screenshots from your external tracker (Copilot, Monarch, Kubera, etc).
+              Rocky will read the balances, match them to your existing accounts, and show you
+              a preview before saving. Add multiple images for a full view.
+            </p>
+
+            <div
+              onClick={() => inputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); }}
+              onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+              className="border-2 border-dashed border-zinc-700 hover:border-amber-500/50 hover:bg-amber-500/5 rounded-xl p-8 text-center cursor-pointer transition"
+            >
+              <p className="text-sm text-zinc-400 mb-1">Drop images here or click to browse</p>
+              <p className="text-[11px] text-zinc-600 font-mono">PNG, JPG, WebP · up to ~10 images</p>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={e => handleFiles(e.target.files)}
+              />
+            </div>
+
+            {files.length > 0 && (
+              <div className="space-y-1.5">
+                {files.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800">
+                    <p className="text-xs font-mono text-zinc-300 truncate flex-1">{f.name}</p>
+                    <p className="text-[10px] font-mono text-zinc-500 mx-3">{Math.round(f.size / 1024)} KB</p>
+                    <button onClick={() => removeFile(i)} className="text-zinc-600 hover:text-red-400 text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {err && <p className="text-xs text-red-400">{err}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={extract}
+                disabled={extracting || files.length === 0}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs py-2 rounded-lg transition"
+              >
+                {extracting ? 'Reading…' : `Extract balances (${files.length})`}
+              </button>
+              <button onClick={onClose} className="text-zinc-500 hover:text-white text-xs px-4 py-2 rounded-lg border border-zinc-800 hover:border-zinc-600 transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div className="px-5 py-5 space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-zinc-800 p-3">
+                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Current NW</p>
+                <p className="text-lg font-bold font-mono tabular-nums text-zinc-400">{fmtMoney(result.totals.current.net)}</p>
+              </div>
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="text-[10px] font-mono text-amber-400/70 uppercase tracking-widest mb-1">Proposed NW</p>
+                <p className="text-lg font-bold font-mono tabular-nums text-amber-400">{fmtMoney(result.totals.proposed.net)}</p>
+              </div>
+              <div className="rounded-xl border border-zinc-800 p-3">
+                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Δ</p>
+                <p className={`text-lg font-bold font-mono tabular-nums ${result.totals.proposed.net >= result.totals.current.net ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {result.totals.proposed.net >= result.totals.current.net ? '+' : ''}{fmtMoney(result.totals.proposed.net - result.totals.current.net)}
+                </p>
+              </div>
+            </div>
+
+            {/* Row list */}
+            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+              {result.results.map((r, i) => {
+                const isNew = !r.match;
+                const oldBal = r.match?.balance ?? 0;
+                const delta = r.extracted.balance - oldBal;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition ${
+                      !included[i] ? 'opacity-40 border-zinc-800' :
+                      isNew ? 'border-cyan-500/30 bg-cyan-500/5' :
+                      'border-zinc-800 bg-[var(--card)]/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={included[i] ?? true}
+                      onChange={e => setIncluded(prev => ({ ...prev, [i]: e.target.checked }))}
+                      className="accent-amber-500 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-white font-medium truncate">{r.extracted.name}</p>
+                        {r.extracted.last4 && (
+                          <span className="text-[10px] font-mono text-zinc-500">·{r.extracted.last4}</span>
+                        )}
+                        {isNew && (
+                          <span className="text-[9px] font-bold font-mono uppercase tracking-widest text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 rounded px-1.5">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono text-zinc-500 truncate">
+                        {r.match ? `Matched "${r.match.name}"` : `Section: ${r.extracted.section ?? 'unknown'}`}
+                      </p>
+                    </div>
+                    {isNew && (
+                      <select
+                        value={categoryOverrides[i] ?? r.suggested_category}
+                        onChange={e => setCategoryOverrides(prev => ({ ...prev, [i]: e.target.value as Category }))}
+                        className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] text-zinc-300 font-mono focus:outline-none"
+                      >
+                        <option value="business">Business</option>
+                        <option value="depository">Depository</option>
+                        <option value="retirement">Retirement</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="auto_loan">Auto Loan</option>
+                        <option value="personal_loan">Personal Loan</option>
+                      </select>
+                    )}
+                    <div className="text-right shrink-0 min-w-[120px]">
+                      <p className="text-sm font-mono font-bold tabular-nums text-white">{fmtMoney(r.extracted.balance)}</p>
+                      {r.match && delta !== 0 && (
+                        <p className={`text-[10px] font-mono tabular-nums ${delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          was {fmtMoney(oldBal)} · {delta >= 0 ? '+' : ''}{fmtMoney(delta)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {result.missing.length > 0 && (
+              <details className="text-xs">
+                <summary className="text-zinc-500 cursor-pointer hover:text-zinc-300">
+                  {result.missing.length} existing account{result.missing.length === 1 ? '' : 's'} not in the screenshots — balances will stay as-is ▾
+                </summary>
+                <div className="mt-2 pl-3 space-y-1 border-l border-zinc-800">
+                  {result.missing.map(m => (
+                    <div key={m.id} className="flex justify-between text-[11px] font-mono">
+                      <span className="text-zinc-500">{m.name}</span>
+                      <span className="text-zinc-600">{fmtMoney(m.current_balance)}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {err && <p className="text-xs text-red-400">{err}</p>}
+
+            <div className="flex gap-2 pt-2 border-t border-zinc-800">
+              <button
+                onClick={apply}
+                disabled={applying}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs py-2 rounded-lg transition"
+              >
+                {applying ? 'Saving…' : 'Save Snapshot'}
+              </button>
+              <button
+                onClick={() => { setResult(null); setFiles([]); }}
+                className="text-zinc-500 hover:text-white text-xs px-4 py-2 rounded-lg border border-zinc-800 hover:border-zinc-600 transition"
+              >
+                Re-upload
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function NetWorthTab() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [editing, setEditing] = useState<Account[]>([]);
@@ -113,6 +404,8 @@ export default function NetWorthTab() {
 
   const [myShares, setMyShares] = useState(2100.01);
   const [seiSharePrice, setSeiSharePrice] = useState<number | null>(null);
+  const [showExtract, setShowExtract] = useState(false);
+  const { toast } = useToast();
 
   function applySharePrice(accounts: Account[], price: number, shares?: number): Account[] {
     const s = shares ?? myShares;
@@ -207,6 +500,26 @@ export default function NetWorthTab() {
       setShowForm(false);
     } catch { /* silent */ } finally {
       setSaving(false);
+    }
+  }
+
+  async function applyExtractedAccounts(accounts: Account[]) {
+    const res = await fetch('/api/net-worth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accounts }),
+    });
+    const d = await res.json();
+    if (d.snapshot) {
+      const snap: Snapshot = { id: d.snapshot.id, date: d.snapshot.date, accounts: d.snapshot.accounts };
+      setSnapshots(prev => {
+        const exists = prev.some(s => s.id === snap.id);
+        return exists ? prev.map(s => s.id === snap.id ? snap : s) : [...prev, snap];
+      });
+      setEditing(snap.accounts);
+      toast('Snapshot saved from screenshots', 'success');
+    } else if (d.error) {
+      toast(`Save failed: ${d.error}`, 'error');
     }
   }
 
@@ -444,6 +757,12 @@ export default function NetWorthTab() {
               </p>
             )}
             <button
+              onClick={() => setShowExtract(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold font-mono tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+            >
+              📷 From Screenshot
+            </button>
+            <button
               onClick={() => {
                 const defaultById = Object.fromEntries(DEFAULT_ACCOUNTS.map(a => [a.id, a]));
                 // Remap old 'liability' accounts to new sub-categories and refresh balances from defaults
@@ -641,6 +960,13 @@ export default function NetWorthTab() {
             })}
           </div>
         </div>
+      )}
+
+      {showExtract && (
+        <ExtractModal
+          onApply={applyExtractedAccounts}
+          onClose={() => setShowExtract(false)}
+        />
       )}
 
     </div>
