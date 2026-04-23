@@ -190,7 +190,6 @@ function TeamCard({ feed, loading, storyline, onRemove, onOpenGame }: {
   onRemove: () => void;
   onOpenGame: (target: GameCenterTarget) => void;
 }) {
-  const [newsExpanded, setNewsExpanded] = useState(false);
 
   if (loading) {
     return <div className="bg-[var(--card)] border border-zinc-800 rounded-xl p-5 animate-pulse h-64" />;
@@ -204,7 +203,7 @@ function TeamCard({ feed, loading, storyline, onRemove, onOpenGame }: {
     );
   }
 
-  const { team, liveGame, lastGame, nextGame, last5, news, standings } = feed;
+  const { team, liveGame, lastGame, nextGame, last5, standings } = feed;
   const leagueColor = LEAGUE_COLORS[team.league] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
   const accent = hexColor(team.color) ?? hexColor(team.altColor);
 
@@ -381,43 +380,6 @@ function TeamCard({ feed, loading, storyline, onRemove, onOpenGame }: {
           </div>
         )}
 
-        {/* News */}
-        {news.length > 0 && (
-          <div className="px-5 py-3">
-            <button
-              onClick={() => setNewsExpanded(e => !e)}
-              className="flex items-center justify-between w-full mb-2"
-            >
-              <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono">News & Highlights</p>
-              <span className="text-zinc-600 text-xs">{newsExpanded ? '▴' : '▾'}</span>
-            </button>
-            {newsExpanded ? (
-              <div className="space-y-2">
-                {news.map(item => (
-                  <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer"
-                    className="flex gap-3 group hover:bg-[var(--card)]/40 rounded-lg p-1.5 transition -mx-1.5">
-                    {item.image && (
-                      <div className="w-16 h-10 relative rounded overflow-hidden shrink-0 bg-zinc-900">
-                        <Image src={item.image} alt="" fill className="object-cover" unoptimized />
-                        {item.type === 'Media' && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <span className="text-white text-xs">▶</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-zinc-300 group-hover:text-white line-clamp-2 leading-snug transition">{item.headline}</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">{timeAgo(item.published)}</p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-zinc-500 line-clamp-1">{news[0]?.headline}</p>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -739,6 +701,277 @@ function TonightStrip({ feeds, onOpenGame }: { feeds: Record<string, TeamFeed | 
   );
 }
 
+type PickRow = {
+  id: string;
+  league: string;
+  team_id: string;
+  event_id: string;
+  pick_date: string;
+  game_date: string;
+  picked_winner_abbr: string;
+  picked_team_abbr: string;
+  opponent_abbr: string;
+  reasoning: string | null;
+  confidence: 'low' | 'medium' | 'high' | null;
+  result: 'win' | 'loss' | 'push' | null;
+  actual_winner_abbr: string | null;
+  final_score: string | null;
+};
+
+type PicksResponse = {
+  today: PickRow[];
+  recent: PickRow[];
+  record: {
+    wins: number; losses: number; pushes: number; total: number;
+    pct: number | null;
+    last7: { wins: number; losses: number };
+  };
+};
+
+function RockysBoard({ data, loading, onOpenGame }: {
+  data: PicksResponse | null;
+  loading: boolean;
+  onOpenGame: (t: GameCenterTarget) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-zinc-800 bg-[var(--card)] p-5">
+        <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-violet-400 mb-3">Rocky's Board</p>
+        <div className="skeleton h-4 w-32 rounded mb-2" />
+        <div className="skeleton h-16 w-full rounded" />
+      </div>
+    );
+  }
+  if (!data) return null;
+  const { today, record, recent } = data;
+  if (today.length === 0 && recent.length === 0) return null;
+
+  function openPick(p: PickRow) {
+    const leagueLower = p.league.toLowerCase();
+    const sport =
+      leagueLower === 'nfl' || leagueLower === 'ncaaf' || leagueLower === 'college-football' ? 'football'
+        : leagueLower === 'nba' ? 'basketball'
+        : leagueLower === 'mlb' ? 'baseball'
+        : 'football';
+    const apiLeague = leagueLower === 'ncaaf' ? 'college-football' : leagueLower;
+    onOpenGame({ sport, league: apiLeague, eventId: p.event_id });
+  }
+
+  const hotStreak = (() => {
+    // Count current win streak from most recent graded picks
+    const graded = recent.filter(r => r.result && r.result !== 'push');
+    let streak = 0;
+    let type: 'win' | 'loss' | null = null;
+    for (const r of graded) {
+      if (type === null) type = r.result as 'win' | 'loss';
+      if (r.result === type) streak++;
+      else break;
+    }
+    return { type, count: streak };
+  })();
+
+  return (
+    <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.04] via-transparent to-transparent p-5">
+      <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <p className="text-[11px] font-bold font-mono uppercase tracking-widest text-violet-400">✦ Rocky's Board</p>
+          <p className="text-[10px] text-zinc-600 font-mono mt-0.5">Daily picks · auto-graded</p>
+        </div>
+        <div className="flex items-center gap-4">
+          {record.pct != null && (
+            <div className="text-right">
+              <p className="text-2xl font-bold font-mono tabular-nums text-white leading-none">
+                {record.wins}<span className="text-zinc-600 text-base font-normal">-{record.losses}</span>
+                {record.pushes > 0 && <span className="text-zinc-600 text-sm">-{record.pushes}</span>}
+              </p>
+              <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
+                {record.pct}% · last 7: {record.last7.wins}-{record.last7.losses}
+              </p>
+            </div>
+          )}
+          {hotStreak.type && hotStreak.count >= 2 && (
+            <span className={`text-[10px] font-bold font-mono px-2 py-1 rounded ${
+              hotStreak.type === 'win' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'text-red-400 bg-red-500/10 border border-red-500/30'
+            }`}>
+              {hotStreak.count} {hotStreak.type === 'win' ? 'W' : 'L'} in a row
+            </span>
+          )}
+        </div>
+      </div>
+
+      {today.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Today's picks</p>
+          {today.map(p => {
+            const confStyle = p.confidence === 'high' ? 'text-amber-400 bg-amber-500/10'
+              : p.confidence === 'medium' ? 'text-zinc-300 bg-zinc-800'
+              : 'text-zinc-500 bg-zinc-900';
+            return (
+              <button
+                key={p.id}
+                onClick={() => openPick(p)}
+                className="w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-lg bg-[var(--card)]/60 border border-zinc-800 hover:border-violet-500/30 hover:bg-violet-500/5 transition"
+              >
+                <div className="flex flex-col items-center shrink-0 w-16">
+                  <p className="text-sm font-bold font-mono text-white">{p.picked_winner_abbr}</p>
+                  <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">wins</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-500 font-mono">
+                    {p.picked_team_abbr} vs {p.opponent_abbr} · {p.league.toUpperCase()}
+                  </p>
+                  {p.reasoning && <p className="text-[12px] text-zinc-300 italic leading-snug mt-0.5">{p.reasoning}</p>}
+                </div>
+                {p.confidence && (
+                  <span className={`text-[9px] font-bold font-mono uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0 ${confStyle}`}>
+                    {p.confidence}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-xs text-zinc-500 italic">No games from David's teams today. Rocky's taking the day off.</p>
+      )}
+
+      {recent.filter(p => p.result).length > 0 && (
+        <details className="mt-4 pt-3 border-t border-zinc-800/60">
+          <summary className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest cursor-pointer hover:text-zinc-300">
+            Last {Math.min(10, recent.filter(p => p.result).length)} graded picks ▾
+          </summary>
+          <div className="mt-2 space-y-1">
+            {recent.filter(p => p.result).slice(0, 10).map(p => (
+              <div key={p.id} className="flex items-center gap-2 text-[11px] font-mono">
+                <span className={`w-4 text-center font-bold ${
+                  p.result === 'win' ? 'text-emerald-400' : p.result === 'loss' ? 'text-red-400' : 'text-zinc-500'
+                }`}>
+                  {p.result === 'win' ? 'W' : p.result === 'loss' ? 'L' : 'P'}
+                </span>
+                <span className="text-zinc-600 w-16 shrink-0">{p.game_date.slice(5)}</span>
+                <span className="text-zinc-400 flex-1 truncate">{p.picked_winner_abbr} over {p.picked_winner_abbr === p.picked_team_abbr ? p.opponent_abbr : p.picked_team_abbr}</span>
+                <span className="text-zinc-600">{p.final_score}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function StatTicker({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
+  const active = Object.values(feeds).filter((f): f is TeamFeed => !!f);
+  if (active.length === 0) return null;
+
+  const now = Date.now();
+  const items: string[] = [];
+
+  for (const f of active) {
+    const abbr = f.team.abbr;
+
+    // Record + streak
+    if (f.standings?.streak) {
+      items.push(`${abbr} ${f.standings.streak}`);
+    } else if (f.team.record) {
+      items.push(`${abbr} ${f.team.record}`);
+    }
+
+    // Last 5
+    if (f.last5.length > 0) {
+      const wins = f.last5.filter(r => r === 'W').length;
+      items.push(`${abbr} ${wins}-${f.last5.length - wins} last ${f.last5.length}`);
+    }
+
+    // Next game
+    if (f.nextGame) {
+      const hrs = (new Date(f.nextGame.date).getTime() - now) / 3600000;
+      if (hrs > 0 && hrs < 72) {
+        const t = new Date(f.nextGame.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+        const d = hrs < 24 ? 'today' : hrs < 48 ? 'tomorrow' : new Date(f.nextGame.date).toLocaleDateString('en-US', { weekday: 'short' });
+        items.push(`${abbr} ${f.nextGame.homeAway === 'home' ? 'vs' : '@'} ${f.nextGame.opponentAbbr} ${d} ${t}`);
+      }
+    }
+
+    // Last game result
+    if (f.lastGame?.result) {
+      items.push(`${abbr} ${f.lastGame.result} ${f.lastGame.teamScore}-${f.lastGame.opponentScore} ${f.lastGame.homeAway === 'home' ? 'vs' : '@'} ${f.lastGame.opponentAbbr}`);
+    }
+  }
+
+  if (items.length === 0) return null;
+  const doubled = [...items, ...items];
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-[var(--card)]/50 py-2">
+      <div className="ticker-track flex gap-6 whitespace-nowrap font-mono text-[11px] text-zinc-400">
+        {doubled.map((text, i) => (
+          <span key={i} className="flex items-center gap-6">
+            <span>{text}</span>
+            <span className="text-zinc-700">·</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NewsFeed({ feeds }: { feeds: Record<string, TeamFeed | null> }) {
+  const [open, setOpen] = useState(false);
+  type Enriched = NewsItem & { teamAbbr: string; teamLeague: string };
+  const all: Enriched[] = [];
+  for (const f of Object.values(feeds)) {
+    if (!f) continue;
+    for (const n of f.news) {
+      all.push({ ...n, teamAbbr: f.team.abbr, teamLeague: f.team.league });
+    }
+  }
+  all.sort((a, b) => (b.published ?? '').localeCompare(a.published ?? ''));
+  if (all.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-[var(--card)] overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-[var(--card)]/60 transition"
+      >
+        <span className="text-[11px] font-bold font-mono uppercase tracking-widest text-zinc-500">Around Your Teams</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-zinc-600">{all.length} headlines</span>
+          <span className={`text-zinc-500 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
+          {all.slice(0, 20).map(item => (
+            <a
+              key={item.id}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-3 px-5 py-3 hover:bg-zinc-900/50 transition"
+            >
+              {item.image ? (
+                <div className="w-14 h-10 relative rounded overflow-hidden shrink-0 bg-zinc-900">
+                  <Image src={item.image} alt="" fill className="object-cover" unoptimized />
+                </div>
+              ) : (
+                <div className="w-14 h-10 shrink-0 bg-zinc-900 rounded" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-zinc-300 leading-snug line-clamp-2">{item.headline}</p>
+                <p className="text-[10px] text-zinc-600 font-mono mt-1">
+                  <span className="text-zinc-500">{item.teamAbbr}</span> · {new Date(item.published).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MorningBrief({ brief, loading }: { brief: string[]; loading: boolean }) {
   const hour = new Date().getHours();
   const label = hour < 11 ? 'Morning Desk' : hour < 17 ? 'Afternoon Desk' : hour < 22 ? 'Evening Desk' : 'Late Desk';
@@ -895,6 +1128,8 @@ export default function SportsTab() {
   const [brief, setBrief] = useState<string[]>([]);
   const [storylines, setStorylines] = useState<Record<string, string>>({});
   const [briefLoading, setBriefLoading] = useState(false);
+  const [picks, setPicks] = useState<PicksResponse | null>(null);
+  const [picksLoading, setPicksLoading] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -926,12 +1161,13 @@ export default function SportsTab() {
     }
   }, [followed, mounted]);
 
-  // Morning Brief — fetch once we have at least one feed, whenever the feed set materially changes
+  // Morning Brief + Rocky's Board — fetch once all feeds are loaded
   useEffect(() => {
     const active = Object.values(feeds).filter((f): f is TeamFeed => !!f);
     if (active.length === 0) return;
     const allLoaded = followed.every(f => feeds[feedKey(f)] !== undefined);
     if (!allLoaded) return;
+
     setBriefLoading(true);
     fetch('/api/sports-brief', {
       method: 'POST',
@@ -947,6 +1183,17 @@ export default function SportsTab() {
       })
       .catch(() => {})
       .finally(() => setBriefLoading(false));
+
+    setPicksLoading(true);
+    fetch('/api/sports-picks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeds: active }),
+    })
+      .then(r => r.json())
+      .then(d => { if (!d.error) setPicks(d); })
+      .catch(() => {})
+      .finally(() => setPicksLoading(false));
   }, [feeds, followed]);
 
   // War Room polling — refresh feeds for teams with a live game every 30s
@@ -996,10 +1243,16 @@ export default function SportsTab() {
         </button>
       </div>
 
+      <StatTicker feeds={feeds} />
+
       <LiveWarRoom feeds={feeds} onOpenGame={setGcTarget} />
 
       {(briefLoading || brief.length > 0) && (
         <MorningBrief brief={brief} loading={briefLoading} />
+      )}
+
+      {(picksLoading || (picks && (picks.today.length > 0 || picks.recent.length > 0))) && (
+        <RockysBoard data={picks} loading={picksLoading} onOpenGame={setGcTarget} />
       )}
 
       <TonightStrip feeds={feeds} onOpenGame={setGcTarget} />
@@ -1067,6 +1320,8 @@ export default function SportsTab() {
       })()}
 
       <WeekView feeds={feeds} onOpenGame={setGcTarget} />
+
+      <NewsFeed feeds={feeds} />
 
       {showAdd && (
         <AddTeamPanel
