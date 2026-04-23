@@ -27,9 +27,10 @@ const DEFAULT_ACCOUNTS: Account[] = [
   { id: 'sei_shares',       name: 'SEI-Miami LLC Shares',             category: 'business',      balance: 888797.00 },
   // Depository
   { id: 'cd',               name: 'Certificate of Deposit',           category: 'depository',    balance: 259296.65 },
+  { id: 'no_penalty_cd',    name: 'No-Penalty CD',                    category: 'depository',    balance: 20000.00  },
   { id: 'money_market',     name: 'Premiere Money Market',            category: 'depository',    balance: 36479.68  },
-  { id: 'spend',            name: 'Spend Account',                    category: 'depository',    balance: 8524.19   },
-  { id: 'hysa',             name: 'High Yield Savings Account',       category: 'depository',    balance: 129.94    },
+  { id: 'spend',            name: 'Spend Account',                    category: 'depository',    balance: 13862.20  },
+  { id: 'hysa',             name: 'High Yield Savings Account',       category: 'depository',    balance: 136.84    },
   // Retirement & Investments
   { id: 'ira',              name: 'IRA',                              category: 'retirement',    balance: 215201.82 },
   { id: 'sei_401k',         name: 'SEI 401(k) Plan',                  category: 'retirement',    balance: 61771.14  },
@@ -37,7 +38,7 @@ const DEFAULT_ACCOUNTS: Account[] = [
   { id: 'hsa',              name: 'Health Savings Account',           category: 'retirement',    balance: 344.21    },
   { id: 'allegiant_401k',   name: 'Allegiant 401(k) Plan',            category: 'retirement',    balance: 0         },
   // Credit Cards
-  { id: 'sw_cc',            name: 'Southwest Rapid Rewards',          category: 'credit_card',   balance: 16000.00, priority: true },
+  { id: 'sw_cc',            name: 'Southwest Rapid Rewards',          category: 'credit_card',   balance: 0 },
   { id: 'amex_plat',        name: 'Amex Platinum',                    category: 'credit_card',   balance: 6599.27   },
   { id: 'chase_4985',       name: 'Chase Ultimate Rewards (4985)',    category: 'credit_card',   balance: 4601.14   },
   { id: 'chase_prime',      name: 'Chase Prime Visa',                 category: 'credit_card',   balance: 6142.38   },
