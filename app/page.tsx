@@ -5,8 +5,6 @@ import SportsTab from './components/SportsTab';
 import TasksTab from './components/TasksTab';
 import IncomeTab from './components/IncomeTab';
 import IncomeChartsTab from './components/IncomeChartsTab';
-import ReadingTab from './components/ReadingTab';
-import TripsTab from './components/TripsTab';
 import NetWorthTab from './components/NetWorthTab';
 import QuickLinks from './components/QuickLinks';
 import NotificationsTab from './components/NotificationsTab';
@@ -23,7 +21,7 @@ import {
   TasksSkeleton, IncomeSkeleton,
 } from './components/Skeletons';
 
-type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'reading' | 'trips' | 'notifications' | 'guide';
+type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'notifications' | 'guide';
 type FinanceSubTab = 'income' | 'finmodel' | 'headcount' | 'equity' | 'deib';
 type PersonalSubTab = 'networth' | 'cashflow';
 
@@ -179,22 +177,6 @@ function IconPersonal({ className }: { className?: string }) {
     </svg>
   );
 }
-function IconReading({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 4h5a2 2 0 0 1 2 2v10a2 2 0 0 0-2-2H3z" />
-      <path d="M17 4h-5a2 2 0 0 0-2 2v10a2 2 0 0 1 2-2h5z" />
-    </svg>
-  );
-}
-function IconTrips({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 2v4M10 14v4M2 10h4M14 10h4" />
-      <circle cx="10" cy="10" r="4" />
-    </svg>
-  );
-}
 function IconChevron({ className, open }: { className?: string; open: boolean }) {
   return (
     <svg className={`${className} transition-transform duration-200 ${open ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -209,8 +191,6 @@ const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactE
   tasks: IconTasks,
   finance: IconFinance,
   personal: IconPersonal,
-  reading: IconReading,
-  trips: IconTrips,
   notifications: IconAlerts,
   guide: IconAlerts, // placeholder — guide isn't in nav
 };
@@ -287,8 +267,6 @@ export default function Home() {
     { key: 'tasks', label: 'Tasks', access: ['owner'], section: 'primary' },
     { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'], section: 'primary' },
     { key: 'personal', label: 'Finance', access: ['owner'], section: 'primary' },
-    { key: 'reading', label: 'Reading', access: ['owner'], section: 'primary' },
-    { key: 'trips', label: 'Trips', access: ['owner'], section: 'primary' },
     { key: 'notifications', label: 'Alerts', access: ['owner'], section: 'admin' },
     { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'], section: 'admin' },
   ];
@@ -627,8 +605,6 @@ export default function Home() {
             {tab === 'finance' && financeTab === 'deib' && <DEIBTab />}
             {tab === 'personal' && personalTab === 'networth' && <Suspense fallback={<NetWorthSkeleton />}><NetWorthTab /></Suspense>}
             {tab === 'personal' && personalTab === 'cashflow' && <CashFlowTab />}
-            {tab === 'reading' && <ReadingTab />}
-            {tab === 'trips' && <TripsTab />}
 
             {tab === 'notifications' && <NotificationsTab />}
             {tab === 'guide' && <GuideTab />}
