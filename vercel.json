@@ -11,6 +11,7 @@
     { "path": "/api/cron/liability-zero",   "schedule": "0 12 * * *" },
     { "path": "/api/cron/monday-briefing",  "schedule": "0 11 * * 1" },
     { "path": "/api/cron/weekly-networth",  "schedule": "0 13 * * 0" },
+    { "path": "/api/cron/sunday-money",     "schedule": "0 22 * * 0" },
     { "path": "/api/cron/car-values",       "schedule": "0 14 * * 0" },
     { "path": "/api/cron/month-close",      "schedule": "0 14 1 * *" },
     { "path": "/api/cron/monthly-recap",    "schedule": "0 13 1 * *" }

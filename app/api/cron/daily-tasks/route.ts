@@ -1,6 +1,7 @@
 import { getSupabase } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { verifyCronSecret } from '@/lib/cronAuth';
+import { getDailyMoneySignals, formatDailyMoneyBlock } from '@/lib/moneySignals';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -82,9 +83,16 @@ export async function GET(request: Request) {
     }
   } catch {}
 
+  // Money anomaly signals (yesterday)
+  let moneyLines: string[] = [];
+  try {
+    const signals = await getDailyMoneySignals();
+    moneyLines = formatDailyMoneyBlock(signals);
+  } catch { /* non-critical */ }
+
   // Build message — only send if there's something to report
-  if (relevant.length === 0 && meetings.length === 0 && !health) {
-    return NextResponse.json({ sent: false, reason: 'no tasks, meetings, or health data' });
+  if (relevant.length === 0 && meetings.length === 0 && !health && moneyLines.length === 0) {
+    return NextResponse.json({ sent: false, reason: 'nothing worth sending' });
   }
 
   const lines: string[] = ['☀️ Rocky · Good Morning'];
@@ -93,6 +101,11 @@ export async function GET(request: Request) {
   if (health) {
     lines.push(`\n${health.line}`);
     if (health.alert) lines.push(`⚠️ ${health.alert}`);
+  }
+
+  // Money signals — only renders if anomalies exist
+  if (moneyLines.length > 0) {
+    lines.push(...moneyLines);
   }
 
   // Calendar
