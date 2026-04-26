@@ -16,12 +16,13 @@ import CashFlowTab from './components/CashFlowTab';
 import Spotlight from './components/Spotlight';
 import AskRocky from './components/AskRocky';
 import GuideTab from './components/GuideTab';
+import GamesTab from './components/GamesTab';
 import {
   BriefingSkeleton, NetWorthSkeleton, SportsSkeleton,
   TasksSkeleton, IncomeSkeleton,
 } from './components/Skeletons';
 
-type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'notifications' | 'guide';
+type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'games' | 'notifications' | 'guide';
 type FinanceSubTab = 'income' | 'finmodel' | 'headcount' | 'equity' | 'deib';
 type PersonalSubTab = 'networth' | 'cashflow';
 
@@ -184,6 +185,16 @@ function IconChevron({ className, open }: { className?: string; open: boolean })
     </svg>
   );
 }
+function IconGames({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="6" width="15" height="9" rx="3" />
+      <path d="M5.5 10h2.5M6.75 8.75v2.5" />
+      <circle cx="13.25" cy="9.5" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="11.25" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactElement> = {
   briefing: IconBriefing,
@@ -191,6 +202,7 @@ const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactE
   tasks: IconTasks,
   finance: IconFinance,
   personal: IconPersonal,
+  games: IconGames,
   notifications: IconAlerts,
   guide: IconAlerts, // placeholder — guide isn't in nav
 };
@@ -202,6 +214,7 @@ export default function Home() {
   const [incomeView, setIncomeView] = useState<'tracker' | 'charts'>('tracker');
   const [financeOpen, setFinanceOpen] = useState(false);
   const [personalOpen, setPersonalOpen] = useState(false);
+  const [gamesOpen, setGamesOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const role = getRole();
   const userName = getUserName();
@@ -269,10 +282,14 @@ export default function Home() {
     } else if (key === 'personal') {
       setPersonalOpen(o => !o);
       setTab('personal');
+    } else if (key === 'games') {
+      setGamesOpen(o => !o);
+      setTab('games');
     } else {
       setTab(key);
       setFinanceOpen(false);
       setPersonalOpen(false);
+      setGamesOpen(false);
     }
   }
 
@@ -282,6 +299,7 @@ export default function Home() {
     { key: 'tasks', label: 'Tasks', access: ['owner'], section: 'primary' },
     { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'], section: 'primary' },
     { key: 'personal', label: 'Finance', access: ['owner'], section: 'primary' },
+    { key: 'games', label: 'Games', access: ['owner'], section: 'primary' },
     { key: 'notifications', label: 'Alerts', access: ['owner'], section: 'admin' },
     { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'], section: 'admin' },
   ];
@@ -298,6 +316,7 @@ export default function Home() {
   useEffect(() => {
     if (tab === 'finance') setFinanceOpen(true);
     if (tab === 'personal') setPersonalOpen(true);
+    if (tab === 'games') setGamesOpen(true);
   }, [tab]);
 
   // Keyboard navigation: 1-N for main tabs, shift+1-N for sub-tabs
@@ -336,6 +355,11 @@ export default function Home() {
   const PERSONAL_SUBS: { key: PersonalSubTab; label: string }[] = [
     { key: 'networth', label: 'Net Worth' },
     { key: 'cashflow', label: 'Cash Flow' },
+  ];
+
+  const GAMES_SUBS: { label: string; href: string }[] = [
+    { label: 'Driving Range', href: '/golf' },
+    { label: 'Connections',   href: '/connections' },
   ];
 
   // Spotlight search items
@@ -455,7 +479,9 @@ export default function Home() {
                   <Icon className={`w-[16px] h-[16px] shrink-0 transition-colors duration-150 ${active ? 'text-amber-400' : 'text-zinc-600 group-hover:text-zinc-400'}`} />
                   <span className="flex-1 text-left">{t.label}</span>
                   <span className={`text-[10px] font-mono tabular-nums px-1.5 rounded transition-opacity duration-150 ${active ? 'bg-amber-500/20 text-amber-400/70' : 'bg-[var(--card)] text-zinc-700 opacity-0 group-hover:opacity-100'}`}>{i + 1}</span>
-                  {(isFinance || t.key === 'personal') && <IconChevron className="w-3 h-3 text-zinc-600" open={isFinance ? financeOpen : personalOpen} />}
+                  {(isFinance || t.key === 'personal' || t.key === 'games') && (
+                    <IconChevron className="w-3 h-3 text-zinc-600" open={isFinance ? financeOpen : t.key === 'personal' ? personalOpen : gamesOpen} />
+                  )}
                 </button>
 
                 {/* Finance sub-items */}
@@ -498,6 +524,21 @@ export default function Home() {
                           tab === 'personal' && personalTab === s.key ? 'text-violet-400/50' : 'text-zinc-700 opacity-0 group-hover/sub:opacity-100'
                         }`}>&#8679;{si + 1}</span>
                       </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Games sub-items */}
+                {t.key === 'games' && gamesOpen && (
+                  <div className="ml-[26px] mt-0.5 mb-1 border-l border-[var(--border)] pl-2.5 space-y-0.5">
+                    {GAMES_SUBS.map(s => (
+                      <a
+                        key={s.href}
+                        href={s.href}
+                        className="w-full flex items-center justify-between px-2 py-1 rounded-md text-xs font-mono text-zinc-600 hover:text-zinc-300 hover:bg-[var(--card)]/40 transition-all duration-150"
+                      >
+                        {s.label}
+                      </a>
                     ))}
                   </div>
                 )}
@@ -641,6 +682,7 @@ export default function Home() {
             {tab === 'personal' && personalTab === 'networth' && <Suspense fallback={<NetWorthSkeleton />}><NetWorthTab /></Suspense>}
             {tab === 'personal' && personalTab === 'cashflow' && <CashFlowTab />}
 
+            {tab === 'games' && <GamesTab />}
             {tab === 'notifications' && <NotificationsTab />}
             {tab === 'guide' && <GuideTab />}
           </div>
