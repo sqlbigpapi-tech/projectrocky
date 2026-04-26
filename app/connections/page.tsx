@@ -32,11 +32,12 @@ const CORPUS: Category[] = [
   { name: 'Ways to start a story', difficulty: 3, words: ['ONCE', 'FIRST', 'BEGINNING', 'OPENING'] },
 ];
 
-const TIER: Record<Difficulty, { label: string; bg: string; ring: string; text: string }> = {
-  0: { label: 'Easy',   bg: 'bg-yellow-500/15',  ring: 'ring-yellow-500/40',  text: 'text-yellow-200'  },
-  1: { label: 'Medium', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', text: 'text-emerald-200' },
-  2: { label: 'Hard',   bg: 'bg-blue-500/15',    ring: 'ring-blue-500/40',    text: 'text-blue-200'    },
-  3: { label: 'Tricky', bg: 'bg-purple-500/15',  ring: 'ring-purple-500/40',  text: 'text-purple-200'  },
+// NYT Connections palette — exact hex values from nytimes.com/games/connections
+const TIER: Record<Difficulty, { label: string; bg: string }> = {
+  0: { label: 'Easy',   bg: 'bg-[#F9DF6D]' }, // yellow
+  1: { label: 'Medium', bg: 'bg-[#A0C35A]' }, // green
+  2: { label: 'Hard',   bg: 'bg-[#B0C4EF]' }, // blue
+  3: { label: 'Tricky', bg: 'bg-[#BA81C5]' }, // purple
 };
 
 function mulberry32(seed: number) {
@@ -314,12 +315,12 @@ export default function ConnectionsPage() {
                 return (
                   <div
                     key={catIdx}
-                    className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center`}
+                    className={`rounded-xl ${tier.bg} px-3 py-3 text-center text-zinc-900`}
                   >
-                    <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
+                    <div className="text-[10px] font-mono font-bold uppercase tracking-widest">
                       {cat.name}
                     </div>
-                    <div className="text-[13px] font-mono font-semibold text-white mt-0.5">
+                    <div className="text-[13px] font-mono font-semibold mt-0.5">
                       {cat.words.join(' · ')}
                     </div>
                   </div>
@@ -331,12 +332,12 @@ export default function ConnectionsPage() {
                 return (
                   <div
                     key={`reveal-${catIdx}`}
-                    className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center opacity-70`}
+                    className={`rounded-xl ${tier.bg} px-3 py-3 text-center text-zinc-900 opacity-75`}
                   >
-                    <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
+                    <div className="text-[10px] font-mono font-bold uppercase tracking-widest">
                       {cat.name}
                     </div>
-                    <div className="text-[13px] font-mono font-semibold text-zinc-300 mt-0.5">
+                    <div className="text-[13px] font-mono font-semibold mt-0.5">
                       {cat.words.join(' · ')}
                     </div>
                   </div>
@@ -355,8 +356,8 @@ export default function ConnectionsPage() {
                       onClick={() => toggle(word)}
                       className={`aspect-[1.4/1] rounded-lg px-1 text-[12px] sm:text-[13px] font-mono font-bold tracking-tight transition-all duration-100 break-words leading-tight ${
                         sel
-                          ? 'bg-zinc-200 text-black scale-[0.97]'
-                          : 'bg-[var(--card)] text-zinc-200 hover:bg-zinc-800 active:scale-[0.97]'
+                          ? 'bg-[#5A594E] text-white scale-[0.97]'
+                          : 'bg-[#EFEFE6] text-zinc-900 hover:bg-[#E0E0D5] active:scale-[0.97]'
                       }`}
                     >
                       {word}
