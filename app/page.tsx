@@ -195,6 +195,14 @@ function IconGames({ className }: { className?: string }) {
     </svg>
   );
 }
+function IconGolf({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 16V4l7 2.5L7 9" />
+      <circle cx="7" cy="16" r="1.5" />
+    </svg>
+  );
+}
 
 const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactElement> = {
   briefing: IconBriefing,
@@ -358,7 +366,7 @@ export default function Home() {
   ];
 
   const GAMES_SUBS: { label: string; href: string }[] = [
-    { label: 'Driving Range', href: '/golf' },
+    { label: 'Driving Range', href: '/driving-range' },
     { label: 'Connections',   href: '/connections' },
   ];
 
@@ -409,7 +417,8 @@ export default function Home() {
     { id: 'action-rocky', label: 'Ask Rocky', section: 'Actions', action: () => setRockyOpen(true) },
     { id: 'action-snapshot', label: 'Save Net Worth Snapshot', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('networth'); setPersonalOpen(true); } },
     { id: 'action-upload', label: 'Upload Transactions CSV', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('cashflow'); setPersonalOpen(true); } },
-    { id: 'action-golf', label: 'Driving Range', sublabel: 'Golf', section: 'Actions', action: () => { window.location.href = '/golf'; } },
+    { id: 'action-golf', label: 'Golf', sublabel: 'Bag & recommender', section: 'Actions', action: () => { window.location.href = '/golf'; } },
+    { id: 'action-driving-range', label: 'Driving Range', sublabel: 'Game', section: 'Actions', action: () => { window.location.href = '/driving-range'; } },
     { id: 'action-connections', label: 'Connections', sublabel: 'Word puzzle', section: 'Actions', action: () => { window.location.href = '/connections'; } },
     // Accounts (navigates to net worth)
     ...['SEI-Miami LLC Shares', 'IRA', '401(k)', 'Certificate of Deposit', 'Money Market'].map(name => ({
@@ -545,6 +554,17 @@ export default function Home() {
               </div>
             );
           })}
+
+          {/* Golf — owner-only standalone link to /golf route */}
+          {role === 'owner' && (
+            <a
+              href="/golf"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 hover:text-zinc-200 hover:bg-[var(--card)]/60 transition-all duration-150 group"
+            >
+              <IconGolf className="w-[16px] h-[16px] shrink-0 text-zinc-600 group-hover:text-zinc-400 transition-colors duration-150" />
+              <span className="flex-1 text-left">Golf</span>
+            </a>
+          )}
         </nav>
 
         {/* Ask Rocky — owner only */}

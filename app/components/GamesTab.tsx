@@ -2,7 +2,7 @@
 
 const GAMES = [
   {
-    href: '/golf',
+    href: '/driving-range',
     title: 'Driving Range',
     tagline: 'Pick a club, time the swing, hit the targets',
     accent: 'from-emerald-500/25 to-emerald-700/5',
