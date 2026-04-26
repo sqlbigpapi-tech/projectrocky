@@ -27,19 +27,18 @@ const CORPUS: Category[] = [
   // Purple — tricky
   { name: 'Mike ___ (last names)', difficulty: 3, words: ['TYSON', 'PENCE', 'TROUT', 'WAZOWSKI'] },
   { name: '___ attack',            difficulty: 3, words: ['HEART', 'PANIC', 'ASTHMA', 'COUNTER'] },
-  { name: 'Words with double letters in middle', difficulty: 3, words: ['BUTTON', 'ATTIC', 'JIGGLE', 'RIBBON'] },
+  { name: 'Double letters in middle', difficulty: 3, words: ['BUTTON', 'ATTIC', 'JIGGLE', 'RIBBON'] },
   { name: 'Words for "exhausted"', difficulty: 3, words: ['BEAT', 'WIPED', 'DRAINED', 'SHOT'] },
   { name: 'Ways to start a story', difficulty: 3, words: ['ONCE', 'FIRST', 'BEGINNING', 'OPENING'] },
 ];
 
-const TIER: Record<Difficulty, { label: string; bg: string; ring: string; text: string; bar: string }> = {
-  0: { label: 'Easy',   bg: 'bg-yellow-500/15',  ring: 'ring-yellow-500/40',  text: 'text-yellow-200',  bar: 'bg-yellow-500'  },
-  1: { label: 'Medium', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', text: 'text-emerald-200', bar: 'bg-emerald-500' },
-  2: { label: 'Hard',   bg: 'bg-blue-500/15',    ring: 'ring-blue-500/40',    text: 'text-blue-200',    bar: 'bg-blue-500'    },
-  3: { label: 'Tricky', bg: 'bg-purple-500/15',  ring: 'ring-purple-500/40',  text: 'text-purple-200',  bar: 'bg-purple-500'  },
+const TIER: Record<Difficulty, { label: string; bg: string; ring: string; text: string }> = {
+  0: { label: 'Easy',   bg: 'bg-yellow-500/15',  ring: 'ring-yellow-500/40',  text: 'text-yellow-200'  },
+  1: { label: 'Medium', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', text: 'text-emerald-200' },
+  2: { label: 'Hard',   bg: 'bg-blue-500/15',    ring: 'ring-blue-500/40',    text: 'text-blue-200'    },
+  3: { label: 'Tricky', bg: 'bg-purple-500/15',  ring: 'ring-purple-500/40',  text: 'text-purple-200'  },
 };
 
-// Deterministic PRNG (Mulberry32) for date-seeded shuffles
 function mulberry32(seed: number) {
   return () => {
     seed = (seed + 0x6D2B79F5) | 0;
@@ -65,21 +64,22 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   }
   return out;
 }
-
 function pickCategoriesForSeed(seedStr: string): Category[] {
   const rng = mulberry32(hashStr(seedStr));
   const tiers: Category[][] = [[], [], [], []];
   CORPUS.forEach(c => tiers[c.difficulty].push(c));
   return tiers.map(tier => shuffle(tier, rng)[0]);
 }
-
 function todayET(): string {
   const eastern = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
   return `${eastern.getFullYear()}-${String(eastern.getMonth() + 1).padStart(2, '0')}-${String(eastern.getDate()).padStart(2, '0')}`;
 }
 
+type Source = 'nyt' | 'local';
+
 type Saved = {
   seed: string;
+  source: Source;
   solved: number[];
   mistakes: number;
   done: 'won' | 'lost' | null;
@@ -91,14 +91,11 @@ export default function ConnectionsPage() {
   const today = useMemo(() => todayET(), []);
   const [seed, setSeed] = useState<string>(today);
   const [isDaily, setIsDaily] = useState(true);
+  const [source, setSource] = useState<Source | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  const categories = useMemo(() => pickCategoriesForSeed(seed), [seed]);
-  const allWords = useMemo(() => categories.flatMap(c => c.words), [categories]);
-
-  const [remaining, setRemaining] = useState<string[]>(() =>
-    shuffle(allWords, mulberry32(hashStr(`grid:${seed}`)))
-  );
+  const [remaining, setRemaining] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [solved, setSolved] = useState<number[]>([]);
   const [mistakes, setMistakes] = useState(0);
@@ -106,33 +103,82 @@ export default function ConnectionsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
 
-  // Restore daily state
+  // Load puzzle (NYT for daily, local for random or fallback)
   useEffect(() => {
-    if (!isDaily) { setHydrated(true); return; }
-    try {
-      const raw = localStorage.getItem(`rocky:connections:${today}`);
-      if (raw) {
-        const s: Saved = JSON.parse(raw);
-        if (s.seed === today) {
-          setRemaining(s.remaining);
-          setSolved(s.solved);
-          setMistakes(s.mistakes);
-          setDone(s.done);
-          setSelected(s.selected || []);
-        }
+    let cancelled = false;
+    setSource(null);
+    setHydrated(false);
+
+    (async () => {
+      let cats: Category[] = [];
+      let src: Source = 'local';
+
+      if (isDaily) {
+        try {
+          const res = await fetch(`/api/connections/today?date=${seed}`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.categories) && data.categories.length === 4) {
+              cats = data.categories;
+              src = 'nyt';
+            }
+          }
+        } catch {}
       }
-    } catch {}
-    setHydrated(true);
-  }, [today, isDaily]);
+
+      if (cats.length === 0) {
+        cats = pickCategoriesForSeed(seed);
+        src = 'local';
+      }
+
+      if (cancelled) return;
+
+      setCategories(cats);
+      setSource(src);
+
+      // Try restore from localStorage (only daily)
+      const lsKey = `rocky:connections:${src}:${seed}`;
+      let restored = false;
+      if (isDaily) {
+        try {
+          const raw = localStorage.getItem(lsKey);
+          if (raw) {
+            const s: Saved = JSON.parse(raw);
+            if (s.seed === seed && s.source === src) {
+              setRemaining(s.remaining);
+              setSolved(s.solved);
+              setMistakes(s.mistakes);
+              setDone(s.done);
+              setSelected(s.selected || []);
+              restored = true;
+            }
+          }
+        } catch {}
+      }
+
+      if (!restored) {
+        const words = cats.flatMap(c => c.words);
+        setRemaining(shuffle(words, mulberry32(hashStr(`grid:${src}:${seed}`))));
+        setSolved([]);
+        setMistakes(0);
+        setDone(null);
+        setSelected([]);
+      }
+
+      setHydrated(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [seed, isDaily]);
 
   // Persist daily state
   useEffect(() => {
-    if (!hydrated || !isDaily) return;
+    if (!hydrated || !isDaily || !source) return;
     try {
-      const s: Saved = { seed, solved, mistakes, done, remaining, selected };
-      localStorage.setItem(`rocky:connections:${today}`, JSON.stringify(s));
+      const s: Saved = { seed, source, solved, mistakes, done, remaining, selected };
+      localStorage.setItem(`rocky:connections:${source}:${seed}`, JSON.stringify(s));
     } catch {}
-  }, [hydrated, isDaily, seed, solved, mistakes, done, remaining, selected, today]);
+  }, [hydrated, isDaily, source, seed, solved, mistakes, done, remaining, selected]);
 
   // Toast auto-dismiss
   useEffect(() => {
@@ -151,7 +197,7 @@ export default function ConnectionsPage() {
   }, [done]);
 
   const submit = useCallback(() => {
-    if (selected.length !== 4 || done) return;
+    if (selected.length !== 4 || done || categories.length === 0) return;
     const idxs = selected.map(w => categories.findIndex(c => c.words.includes(w)));
     const counts: Record<number, number> = {};
     idxs.forEach(i => { counts[i] = (counts[i] || 0) + 1; });
@@ -186,7 +232,6 @@ export default function ConnectionsPage() {
         }
         return next;
       });
-      // keep selection so user sees what they tried; clear after a beat
       setTimeout(() => setSelected([]), 600);
     }
   }, [selected, categories, done]);
@@ -201,44 +246,13 @@ export default function ConnectionsPage() {
     const rseed = `random:${Math.random().toString(36).slice(2)}`;
     setIsDaily(false);
     setSeed(rseed);
-    const cats = pickCategoriesForSeed(rseed);
-    const words = cats.flatMap(c => c.words);
-    setRemaining(shuffle(words, mulberry32(hashStr(`grid:${rseed}`))));
-    setSelected([]);
-    setSolved([]);
-    setMistakes(0);
-    setDone(null);
-    setToast(null);
   }, []);
 
   const backToDaily = useCallback(() => {
     setIsDaily(true);
     setSeed(today);
-    // Reload from localStorage on next effect tick — easier: just reset state and let restore kick in
-    const cats = pickCategoriesForSeed(today);
-    const words = cats.flatMap(c => c.words);
-    try {
-      const raw = localStorage.getItem(`rocky:connections:${today}`);
-      if (raw) {
-        const s: Saved = JSON.parse(raw);
-        if (s.seed === today) {
-          setRemaining(s.remaining);
-          setSolved(s.solved);
-          setMistakes(s.mistakes);
-          setDone(s.done);
-          setSelected(s.selected || []);
-          return;
-        }
-      }
-    } catch {}
-    setRemaining(shuffle(words, mulberry32(hashStr(`grid:${today}`))));
-    setSolved([]);
-    setMistakes(0);
-    setDone(null);
-    setSelected([]);
   }, [today]);
 
-  // Show solved categories at top, in tier order; reveal unsolved if game is lost
   const solvedSet = new Set(solved);
   const toReveal = done === 'lost' ? categories.map((_, i) => i).filter(i => !solvedSet.has(i)) : [];
 
@@ -251,166 +265,190 @@ export default function ConnectionsPage() {
           <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-purple-300 via-blue-300 to-emerald-300 bg-clip-text text-transparent">
             Connections
           </h1>
-          <span className="text-[10px] font-mono text-zinc-600 tabular-nums">
-            {isDaily ? today : 'random'}
-          </span>
-        </div>
-
-        {/* Status */}
-        <div className="flex items-center justify-between mb-4 text-xs font-mono">
-          <span className="text-zinc-500">
-            <span className="text-zinc-300">{solved.length}</span>/4 solved
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500 mr-1">mistakes</span>
-            {[0, 1, 2, 3].map(i => (
-              <span
-                key={i}
-                className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                  i < mistakes ? 'bg-zinc-500' : 'bg-zinc-700'
-                }`}
-              />
-            ))}
+          <div className="text-right">
+            <div className="text-[10px] font-mono text-zinc-600 tabular-nums">
+              {isDaily ? today : 'random'}
+            </div>
+            {source && isDaily && (
+              <div className={`text-[8px] font-mono uppercase tracking-widest mt-0.5 ${
+                source === 'nyt' ? 'text-emerald-500' : 'text-amber-500'
+              }`}>
+                {source === 'nyt' ? 'NYT' : 'fallback'}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Solved rows */}
-        <div className="space-y-2 mb-3">
-          {solved.map(catIdx => {
-            const cat = categories[catIdx];
-            const tier = TIER[cat.difficulty];
-            return (
-              <div
-                key={catIdx}
-                className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center`}
-              >
-                <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
-                  {cat.name}
-                </div>
-                <div className="text-[13px] font-mono font-semibold text-white mt-0.5">
-                  {cat.words.join(' · ')}
-                </div>
-              </div>
-            );
-          })}
-          {toReveal.map(catIdx => {
-            const cat = categories[catIdx];
-            const tier = TIER[cat.difficulty];
-            return (
-              <div
-                key={`reveal-${catIdx}`}
-                className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center opacity-70`}
-              >
-                <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
-                  {cat.name}
-                </div>
-                <div className="text-[13px] font-mono font-semibold text-zinc-300 mt-0.5">
-                  {cat.words.join(' · ')}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* Loading */}
+        {!hydrated && (
+          <div className="text-center py-16 text-xs font-mono text-zinc-500">
+            Loading puzzle…
+          </div>
+        )}
 
-        {/* Grid */}
-        {remaining.length > 0 && !done && (
-          <div className={`grid grid-cols-4 gap-2 mb-4 ${shake ? 'animate-[shake_0.4s_ease]' : ''}`}>
-            {remaining.map(word => {
-              const sel = selected.includes(word);
-              return (
+        {hydrated && (
+          <>
+            {/* Status */}
+            <div className="flex items-center justify-between mb-4 text-xs font-mono">
+              <span className="text-zinc-500">
+                <span className="text-zinc-300">{solved.length}</span>/4 solved
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-zinc-500 mr-1">mistakes</span>
+                {[0, 1, 2, 3].map(i => (
+                  <span
+                    key={i}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                      i < mistakes ? 'bg-zinc-500' : 'bg-zinc-700'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Solved + revealed rows */}
+            <div className="space-y-2 mb-3">
+              {solved.map(catIdx => {
+                const cat = categories[catIdx];
+                const tier = TIER[cat.difficulty];
+                return (
+                  <div
+                    key={catIdx}
+                    className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center`}
+                  >
+                    <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
+                      {cat.name}
+                    </div>
+                    <div className="text-[13px] font-mono font-semibold text-white mt-0.5">
+                      {cat.words.join(' · ')}
+                    </div>
+                  </div>
+                );
+              })}
+              {toReveal.map(catIdx => {
+                const cat = categories[catIdx];
+                const tier = TIER[cat.difficulty];
+                return (
+                  <div
+                    key={`reveal-${catIdx}`}
+                    className={`rounded-xl ${tier.bg} ring-1 ${tier.ring} px-3 py-2.5 text-center opacity-70`}
+                  >
+                    <div className={`text-[10px] font-mono font-bold uppercase tracking-widest ${tier.text}`}>
+                      {cat.name}
+                    </div>
+                    <div className="text-[13px] font-mono font-semibold text-zinc-300 mt-0.5">
+                      {cat.words.join(' · ')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Grid */}
+            {remaining.length > 0 && !done && (
+              <div className={`grid grid-cols-4 gap-2 mb-4 ${shake ? 'animate-[shake_0.4s_ease]' : ''}`}>
+                {remaining.map(word => {
+                  const sel = selected.includes(word);
+                  return (
+                    <button
+                      key={word}
+                      onClick={() => toggle(word)}
+                      className={`aspect-[1.4/1] rounded-lg px-1 text-[12px] sm:text-[13px] font-mono font-bold tracking-tight transition-all duration-100 break-words leading-tight ${
+                        sel
+                          ? 'bg-zinc-200 text-black scale-[0.97]'
+                          : 'bg-[var(--card)] text-zinc-200 hover:bg-zinc-800 active:scale-[0.97]'
+                      }`}
+                    >
+                      {word}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Toast */}
+            <div className="h-7 flex items-center justify-center mb-2">
+              {toast && (
+                <div className="px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-xs font-mono text-zinc-200 shadow-lg">
+                  {toast}
+                </div>
+              )}
+            </div>
+
+            {/* Controls */}
+            {!done && (
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <button
-                  key={word}
-                  onClick={() => toggle(word)}
-                  className={`aspect-[1.4/1] rounded-lg px-1 text-[12px] sm:text-[13px] font-mono font-bold tracking-tight transition-all duration-100 break-words leading-tight ${
-                    sel
-                      ? 'bg-zinc-200 text-black scale-[0.97]'
-                      : 'bg-[var(--card)] text-zinc-200 hover:bg-zinc-800 active:scale-[0.97]'
+                  onClick={shuffleRemaining}
+                  disabled={remaining.length === 0}
+                  className="py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 transition"
+                >
+                  SHUFFLE
+                </button>
+                <button
+                  onClick={deselect}
+                  disabled={selected.length === 0}
+                  className="py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 transition"
+                >
+                  DESELECT
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={selected.length !== 4}
+                  className={`py-2.5 rounded-xl text-[11px] font-mono font-bold tracking-widest transition ${
+                    selected.length === 4
+                      ? 'bg-emerald-500 text-black hover:bg-emerald-400 active:scale-[0.99]'
+                      : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
                   }`}
                 >
-                  {word}
+                  SUBMIT
                 </button>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Toast */}
-        <div className="h-7 flex items-center justify-center mb-2">
-          {toast && (
-            <div className="px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 text-xs font-mono text-zinc-200 shadow-lg">
-              {toast}
+            {/* End state */}
+            {done && (
+              <div className={`rounded-xl border p-4 text-center mb-4 ${
+                done === 'won' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-red-500/40 bg-red-500/10'
+              }`}>
+                <div className="text-sm font-mono font-bold text-white">
+                  {done === 'won' ? `Solved with ${mistakes} mistake${mistakes === 1 ? '' : 's'}` : 'Better luck next time'}
+                </div>
+                <div className="text-[11px] font-mono text-zinc-400 mt-1">
+                  {isDaily
+                    ? (done === 'won' ? 'Come back tomorrow for a new puzzle' : 'New puzzle tomorrow')
+                    : 'Random puzzle complete'}
+                </div>
+              </div>
+            )}
+
+            {/* Random/daily toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={newRandom}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition"
+              >
+                {done || !isDaily ? 'PLAY RANDOM' : 'SKIP TO RANDOM'}
+              </button>
+              {!isDaily && (
+                <button
+                  onClick={backToDaily}
+                  className="flex-1 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition"
+                >
+                  BACK TO DAILY
+                </button>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Controls */}
-        {!done && (
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <button
-              onClick={shuffleRemaining}
-              disabled={remaining.length === 0}
-              className="py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 transition"
-            >
-              SHUFFLE
-            </button>
-            <button
-              onClick={deselect}
-              disabled={selected.length === 0}
-              className="py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 transition"
-            >
-              DESELECT
-            </button>
-            <button
-              onClick={submit}
-              disabled={selected.length !== 4}
-              className={`py-2.5 rounded-xl text-[11px] font-mono font-bold tracking-widest transition ${
-                selected.length === 4
-                  ? 'bg-emerald-500 text-black hover:bg-emerald-400 active:scale-[0.99]'
-                  : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-              }`}
-            >
-              SUBMIT
-            </button>
-          </div>
-        )}
-
-        {/* End state */}
-        {done && (
-          <div className={`rounded-xl border p-4 text-center mb-4 ${
-            done === 'won' ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-red-500/40 bg-red-500/10'
-          }`}>
-            <div className="text-sm font-mono font-bold text-white">
-              {done === 'won' ? `Solved with ${mistakes} mistake${mistakes === 1 ? '' : 's'}` : 'Better luck next time'}
+            <div className="text-center text-[10px] font-mono text-zinc-700 mt-4 tracking-widest">
+              {source === 'nyt'
+                ? 'Today’s NYT puzzle · 4 mistakes max'
+                : source === 'local'
+                ? 'Local fallback puzzle · 4 mistakes max'
+                : 'Pick 4 words that share a connection'}
             </div>
-            <div className="text-[11px] font-mono text-zinc-400 mt-1">
-              {isDaily
-                ? (done === 'won' ? 'Come back tomorrow for a new puzzle' : 'New puzzle tomorrow')
-                : 'Random puzzle complete'}
-            </div>
-          </div>
+          </>
         )}
-
-        {/* Random/daily toggle */}
-        <div className="flex gap-2">
-          <button
-            onClick={newRandom}
-            className="flex-1 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition"
-          >
-            {done || !isDaily ? 'PLAY RANDOM' : 'SKIP TO RANDOM'}
-          </button>
-          {!isDaily && (
-            <button
-              onClick={backToDaily}
-              className="flex-1 py-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)]/40 text-[11px] font-mono font-bold tracking-widest text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition"
-            >
-              BACK TO DAILY
-            </button>
-          )}
-        </div>
-
-        <div className="text-center text-[10px] font-mono text-zinc-700 mt-4 tracking-widest">
-          Pick 4 words that share a connection · 4 mistakes max
-        </div>
       </div>
 
       <style jsx global>{`
