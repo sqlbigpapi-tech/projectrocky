@@ -386,6 +386,7 @@ export default function Home() {
     { id: 'action-snapshot', label: 'Save Net Worth Snapshot', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('networth'); setPersonalOpen(true); } },
     { id: 'action-upload', label: 'Upload Transactions CSV', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('cashflow'); setPersonalOpen(true); } },
     { id: 'action-golf', label: 'Driving Range', sublabel: 'Golf', section: 'Actions', action: () => { window.location.href = '/golf'; } },
+    { id: 'action-connections', label: 'Connections', sublabel: 'Word puzzle', section: 'Actions', action: () => { window.location.href = '/connections'; } },
     // Accounts (navigates to net worth)
     ...['SEI-Miami LLC Shares', 'IRA', '401(k)', 'Certificate of Deposit', 'Money Market'].map(name => ({
       id: `acct-${name}`,
