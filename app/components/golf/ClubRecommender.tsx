@@ -25,7 +25,7 @@ function ClubRow({ label, club, accent }: { label: string; club: Club | null; ac
   );
 }
 
-export default function ClubRecommender() {
+export default function ClubRecommender({ clubs }: { clubs: Club[] }) {
   const [distance, setDistance] = useState<string>('150');
   const [wind, setWind] = useState<string>('0');
 
@@ -34,8 +34,8 @@ export default function ClubRecommender() {
   const clamped = Math.max(-20, Math.min(20, windNum));
 
   const rec: Recommendation | null = useMemo(
-    () => recommendClub(distNum, clamped),
-    [distNum, clamped],
+    () => recommendClub(distNum, clamped, clubs),
+    [distNum, clamped, clubs],
   );
 
   return (
@@ -105,7 +105,9 @@ export default function ClubRecommender() {
           </div>
         </div>
       ) : (
-        <div className="text-sm font-mono text-zinc-500 px-1">Enter a target distance.</div>
+        <div className="text-sm font-mono text-zinc-500 px-1">
+          {clubs.length === 0 ? 'Add some clubs to your bag first.' : 'Enter a target distance.'}
+        </div>
       )}
     </div>
   );

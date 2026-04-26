@@ -1,7 +1,27 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { Club } from '@/lib/golf/clubs';
 import DistanceChart from '@/app/components/golf/DistanceChart';
 import ClubRecommender from '@/app/components/golf/ClubRecommender';
 
 export default function GolfPage() {
+  const [clubs, setClubs] = useState<Club[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch('/api/golf/clubs', { cache: 'no-store' });
+      if (!r.ok) throw new Error(`status ${r.status}`);
+      const { clubs } = await r.json();
+      setClubs(clubs ?? []);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="max-w-3xl mx-auto p-5 md:p-8">
@@ -14,13 +34,25 @@ export default function GolfPage() {
           <div className="w-12" />
         </div>
 
+        {error && (
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 mb-4 text-xs font-mono text-red-300">
+            {error}. Make sure the <code className="text-red-200">golf_clubs</code> table exists — run <code className="text-red-200">scripts/golf-clubs-schema.sql</code> in Supabase.
+          </div>
+        )}
+
         {/* Section: Bag */}
         <section className="mb-8">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-base font-bold text-zinc-100">My Bag</h2>
             <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Distances</span>
           </div>
-          <DistanceChart />
+          {clubs ? (
+            <DistanceChart clubs={clubs} onChanged={refresh} />
+          ) : (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-6 text-center text-xs font-mono text-zinc-500">
+              Loading bag…
+            </div>
+          )}
         </section>
 
         {/* Section: Recommender */}
@@ -29,7 +61,7 @@ export default function GolfPage() {
             <h2 className="text-base font-bold text-zinc-100">Club Recommender</h2>
             <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Pick the stick</span>
           </div>
-          <ClubRecommender />
+          <ClubRecommender clubs={clubs ?? []} />
         </section>
 
         {/* Section: Recent Rounds (Phase 2 placeholder) */}
