@@ -2,12 +2,12 @@
 
 const GAMES = [
   {
-    href: '/driving-range',
-    title: 'Driving Range',
-    tagline: 'Pick a club, time the swing, hit the targets',
-    accent: 'from-emerald-500/25 to-emerald-700/5',
-    border: 'border-emerald-500/30',
-    pill: 'text-emerald-400',
+    href: '/bets',
+    title: 'Best Bets',
+    tagline: "Tonight's lines, expert picks, line shopping",
+    accent: 'from-amber-500/25 to-amber-700/5',
+    border: 'border-amber-500/30',
+    pill: 'text-amber-400',
   },
   {
     href: '/connections',
@@ -16,6 +16,14 @@ const GAMES = [
     accent: 'from-purple-500/25 via-blue-500/15 to-purple-700/5',
     border: 'border-purple-500/30',
     pill: 'text-purple-400',
+  },
+  {
+    href: '/driving-range',
+    title: 'Driving Range',
+    tagline: 'Pick a club, time the swing, hit the targets',
+    accent: 'from-emerald-500/25 to-emerald-700/5',
+    border: 'border-emerald-500/30',
+    pill: 'text-emerald-400',
   },
 ];
 

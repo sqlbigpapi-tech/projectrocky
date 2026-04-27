@@ -363,8 +363,9 @@ export default function Home() {
   ];
 
   const GAMES_SUBS: { label: string; href: string }[] = [
-    { label: 'Driving Range', href: '/driving-range' },
+    { label: 'Best Bets',     href: '/bets' },
     { label: 'Connections',   href: '/connections' },
+    { label: 'Driving Range', href: '/driving-range' },
   ];
 
   // Spotlight search items
@@ -416,6 +417,7 @@ export default function Home() {
     { id: 'action-upload', label: 'Upload Transactions CSV', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('cashflow'); setPersonalOpen(true); } },
     { id: 'action-driving-range', label: 'Driving Range', sublabel: 'Game', section: 'Actions', action: () => { window.location.href = '/driving-range'; } },
     { id: 'action-connections', label: 'Connections', sublabel: 'Word puzzle', section: 'Actions', action: () => { window.location.href = '/connections'; } },
+    { id: 'action-bets', label: 'Best Bets', sublabel: 'Sports lines & expert picks', section: 'Actions', action: () => { window.location.href = '/bets'; } },
     // Accounts (navigates to net worth)
     ...['SEI-Miami LLC Shares', 'IRA', '401(k)', 'Certificate of Deposit', 'Money Market'].map(name => ({
       id: `acct-${name}`,
