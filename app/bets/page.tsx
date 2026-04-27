@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 type ExpertPick = {
   sport: string;
   game: string;
+  homeTeam: string;
+  awayTeam: string;
   startsAt: string;
   pick: string;
   expert: string;
@@ -37,14 +39,17 @@ function timeFmt(iso: string): string {
   return d.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
 }
 
-function gameKey(g: GameLines) { return `${g.away} @ ${g.home}`; }
-
-/** Fuzzy: does this expert pick reference this game? */
+/** Match an expert pick to a game by full team name. Picks match if either side matches. */
 function pickMatchesGame(pick: ExpertPick, g: GameLines): boolean {
-  const text = pick.game.toLowerCase();
-  const home = g.home.toLowerCase().split(' ').pop() ?? '';
-  const away = g.away.toLowerCase().split(' ').pop() ?? '';
-  return !!(home && away && (text.includes(home) || text.includes(away)));
+  if (!pick.homeTeam && !pick.awayTeam) return false;
+  const gh = g.home.toLowerCase();
+  const ga = g.away.toLowerCase();
+  const ph = pick.homeTeam.toLowerCase();
+  const pa = pick.awayTeam.toLowerCase();
+  // Exact full-name pair (either orientation), or single-side full-name match
+  const homeHit = ph && (ph === gh || ph === ga);
+  const awayHit = pa && (pa === gh || pa === ga);
+  return Boolean(homeHit || awayHit);
 }
 
 export default function BetsPage() {
@@ -94,53 +99,17 @@ export default function BetsPage() {
           Aggregator · house has the edge
         </p>
 
-        {/* Expert picks */}
-        <section className="mb-8">
-          <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-base font-bold text-zinc-100">Tonight&apos;s Expert Picks</h2>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">via Covers</span>
-          </div>
-          {picksErr && (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs font-mono text-red-300">
-              Picks unavailable: {picksErr}
-            </div>
-          )}
-          {picks === null && !picksErr && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-xs font-mono text-zinc-500">
-              Loading picks…
-            </div>
-          )}
-          {picks && picks.length === 0 && !picksErr && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-xs font-mono text-zinc-500">
-              No picks published yet today.
-            </div>
-          )}
-          {picks && picks.length > 0 && (
-            <div className="space-y-2">
-              {picks.map((p, i) => (
-                <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-950/40 px-4 py-3">
-                  <div className="flex items-baseline justify-between gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-amber-500">
-                      {p.sport}
-                    </span>
-                    <span className="text-[10px] font-mono text-zinc-600 truncate ml-2">{p.startsAt}</span>
-                  </div>
-                  <div className="text-sm font-semibold text-zinc-100">{p.pick}</div>
-                  <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                    {p.game} · <span className="text-zinc-400">{p.expert}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Slate */}
+        {/* Slate (with picks attached per game) */}
         <section className="mb-6">
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-base font-bold text-zinc-100">Tonight&apos;s Slate</h2>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Best lines across books</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Lines + expert picks</span>
           </div>
+          {picksErr && (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 mb-3 text-xs font-mono text-red-300">
+              Picks unavailable: {picksErr}
+            </div>
+          )}
           {oddsErr && (
             <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs font-mono text-red-300">
               Odds unavailable: {oddsErr}
@@ -243,6 +212,35 @@ export default function BetsPage() {
             </div>
           )}
         </section>
+
+        {/* Picks that didn't match any game on the slate (different sport, outside 36h, or parse miss) */}
+        {(() => {
+          if (!picks || !games || games.length === 0) return null;
+          const orphans = picks.filter(p => !games.some(g => pickMatchesGame(p, g)));
+          if (orphans.length === 0) return null;
+          return (
+            <section className="mb-6">
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-base font-bold text-zinc-100">Other Picks</h2>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">No matched game on slate</span>
+              </div>
+              <div className="space-y-2">
+                {orphans.map((p, i) => (
+                  <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-950/40 px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-amber-500">{p.sport}</span>
+                      <span className="text-[10px] font-mono text-zinc-600 truncate ml-2">{p.startsAt}</span>
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-100">{p.pick}</div>
+                    <div className="text-[11px] font-mono text-zinc-500 mt-0.5">
+                      {p.game} · <span className="text-zinc-400">{p.expert}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
         <p className="text-center text-[10px] font-mono text-zinc-700 mt-6 leading-relaxed">
           Lines via The Odds API · expert picks scraped from Covers.com<br/>
