@@ -122,12 +122,6 @@ function getRole(): string {
   return match?.[1] ?? 'owner';
 }
 
-function getUserName(): string {
-  if (typeof document === 'undefined') return 'David';
-  const match = document.cookie.match(/(?:^|; )user_name=([^;]*)/);
-  return match?.[1] ?? 'David';
-}
-
 /* ── SVG Icons (20×20) ── */
 function IconBriefing({ className }: { className?: string }) {
   return (
@@ -226,7 +220,6 @@ export default function Home() {
   const [gamesOpen, setGamesOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const role = getRole();
-  const userName = getUserName();
   const isTeam = role === 'team';
   const isManager = role === 'manager';
 
@@ -421,7 +414,6 @@ export default function Home() {
     { id: 'action-rocky', label: 'Ask Rocky', section: 'Actions', action: () => setRockyOpen(true) },
     { id: 'action-snapshot', label: 'Save Net Worth Snapshot', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('networth'); setPersonalOpen(true); } },
     { id: 'action-upload', label: 'Upload Transactions CSV', section: 'Actions', action: () => { setTab('personal'); setPersonalTab('cashflow'); setPersonalOpen(true); } },
-    { id: 'action-golf', label: 'Golf', sublabel: 'Bag & recommender', section: 'Actions', action: () => { window.location.href = '/golf'; } },
     { id: 'action-driving-range', label: 'Driving Range', sublabel: 'Game', section: 'Actions', action: () => { window.location.href = '/driving-range'; } },
     { id: 'action-connections', label: 'Connections', sublabel: 'Word puzzle', section: 'Actions', action: () => { window.location.href = '/connections'; } },
     // Accounts (navigates to net worth)
