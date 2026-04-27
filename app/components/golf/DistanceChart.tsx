@@ -6,8 +6,9 @@ import { estimateCarry, estimateTotal } from '@/lib/golf/estimate';
 import ClubIcon, { categoryFor } from './ClubIcon';
 
 function Thumb({ club, size = 'md' }: { club: Club; size?: 'sm' | 'md' }) {
-  const sz = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
-  const wrap = `shrink-0 ${sz} rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden`;
+  const sz = size === 'sm' ? 'w-16 h-16' : 'w-20 h-20';
+  const inner = size === 'sm' ? 'w-12 h-12' : 'w-14 h-14';
+  const wrap = `shrink-0 ${sz} rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden p-1.5`;
   if (club.image) {
     // eslint-disable-next-line @next/next/no-img-element
     return (
@@ -18,7 +19,7 @@ function Thumb({ club, size = 'md' }: { club: Club; size?: 'sm' | 'md' }) {
   }
   return (
     <div className={wrap}>
-      <ClubIcon category={categoryFor(club.club)} className={size === 'sm' ? 'w-7 h-7' : 'w-9 h-9'} />
+      <ClubIcon category={categoryFor(club.club)} className={inner} />
     </div>
   );
 }
