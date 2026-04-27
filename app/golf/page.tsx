@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Club } from '@/lib/golf/clubs';
 import DistanceChart from '@/app/components/golf/DistanceChart';
 import ClubRecommender from '@/app/components/golf/ClubRecommender';
+import GapAnalysis from '@/app/components/golf/GapAnalysis';
 
 export default function GolfPage() {
   const [clubs, setClubs] = useState<Club[] | null>(null);
@@ -64,15 +65,13 @@ export default function GolfPage() {
           <ClubRecommender clubs={clubs ?? []} />
         </section>
 
-        {/* Section: Recent Rounds (Phase 2 placeholder) */}
+        {/* Section: Gap Analysis */}
         <section>
           <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-base font-bold text-zinc-100">Recent Rounds</h2>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Phase 2</span>
+            <h2 className="text-base font-bold text-zinc-100">Gap Analysis</h2>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">Find the holes</span>
           </div>
-          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 p-6 text-center">
-            <p className="text-sm font-mono text-zinc-500">Round logging coming soon</p>
-          </div>
+          {clubs && <GapAnalysis clubs={clubs} />}
         </section>
       </div>
     </main>
