@@ -443,7 +443,7 @@ export default function Home() {
     <main suppressHydrationWarning className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
 
       {/* ── Desktop Sidebar (md+) ── */}
-      <aside className="hidden md:flex fixed top-0 left-0 h-screen w-56 flex-col bg-[var(--card)] border-r border-[var(--border)]/40 z-40">
+      <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-56 flex-col bg-[var(--card)] border-r border-[var(--border)]/40 z-40">
         {/* Logo */}
         <div className="px-5 pt-6 pb-5 border-b border-[var(--border)]/40">
           <div className="flex items-center gap-2.5">
@@ -619,7 +619,7 @@ export default function Home() {
       </aside>
 
       {/* ── Mobile Header ── */}
-      <div className="md:hidden px-5 pt-5 pb-3 border-b border-[var(--border)]/60">
+      <div className="lg:hidden px-5 pt-5 pb-3 border-b border-[var(--border)]/60">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
@@ -637,7 +637,7 @@ export default function Home() {
       </div>
 
       {/* ── Content Area ── */}
-      <div className="md:ml-56 min-h-screen">
+      <div className="lg:ml-56 min-h-screen">
         <div className="max-w-6xl mx-auto p-5 md:p-8 pb-24 md:pb-8">
 
           {/* Quick Links */}
@@ -712,13 +712,13 @@ export default function Home() {
       {/* ── Mobile Ask Rocky FAB — owner only ── */}
       {role === 'owner' && <button
         onClick={() => setRockyOpen(true)}
-        className="md:hidden fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30 active:scale-95 transition-transform"
+        className="lg:hidden fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30 active:scale-95 transition-transform"
       >
         <span className="text-black font-bold text-lg font-mono">R</span>
       </button>}
 
       {/* ── Mobile Bottom Nav ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--card)]/95 backdrop-blur-lg border-t border-[var(--border)]/60 z-40">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--card)]/95 backdrop-blur-lg border-t border-[var(--border)]/60 z-40">
         <div className="flex items-center justify-around px-2 py-1.5">
           {MAIN_TABS.map(t => {
             const Icon = TAB_ICONS[t.key];
