@@ -3,6 +3,25 @@
 import { useState, useCallback } from 'react';
 import { Club, parseLoft } from '@/lib/golf/clubs';
 import { estimateCarry, estimateTotal } from '@/lib/golf/estimate';
+import ClubIcon, { categoryFor } from './ClubIcon';
+
+function Thumb({ club, size = 'md' }: { club: Club; size?: 'sm' | 'md' }) {
+  const sz = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
+  const wrap = `shrink-0 ${sz} rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden`;
+  if (club.image) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <div className={wrap}>
+        <img src={club.image} alt={club.club} className="max-w-full max-h-full object-contain" />
+      </div>
+    );
+  }
+  return (
+    <div className={wrap}>
+      <ClubIcon category={categoryFor(club.club)} className={size === 'sm' ? 'w-7 h-7' : 'w-9 h-9'} />
+    </div>
+  );
+}
 
 type Field = 'club' | 'loft' | 'carry' | 'total' | 'model';
 
@@ -246,14 +265,19 @@ export default function DistanceChart({ clubs, onChanged }: { clubs: Club[]; onC
                 className={`border-t border-zinc-800/60 ${i % 2 === 0 ? 'bg-zinc-950/40' : ''} ${c.id && pending.has(c.id) ? 'opacity-60' : ''}`}
               >
                 <td className="px-2 py-2 align-top w-[44%]">
-                  <Cell value={c.club} field="club" onCommit={v => handlePatch(c, 'club', v)} className="text-zinc-200" />
-                  <div className="px-1.5">
-                    <Cell
-                      value={c.model}
-                      field="model"
-                      onCommit={v => handlePatch(c, 'model', v)}
-                      className="text-[11px] text-zinc-500 leading-snug"
-                    />
+                  <div className="flex items-start gap-2.5">
+                    <Thumb club={c} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <Cell value={c.club} field="club" onCommit={v => handlePatch(c, 'club', v)} className="text-zinc-200" />
+                      <div className="px-1.5">
+                        <Cell
+                          value={c.model}
+                          field="model"
+                          onCommit={v => handlePatch(c, 'model', v)}
+                          className="text-[11px] text-zinc-500 leading-snug"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td className="px-2 py-2 align-top">
@@ -287,7 +311,8 @@ export default function DistanceChart({ clubs, onChanged }: { clubs: Club[]; onC
             key={c.id ?? c.position}
             className={`rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-3 ${c.id && pending.has(c.id) ? 'opacity-60' : ''}`}
           >
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-3">
+              <Thumb club={c} />
               <div className="min-w-0 flex-1">
                 <Cell value={c.club} field="club" onCommit={v => handlePatch(c, 'club', v)} className="text-sm font-semibold text-zinc-100" />
                 <div className="px-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5">

@@ -9,8 +9,12 @@ create table if not exists golf_clubs (
   carry       int  not null,
   total       int  not null,
   model       text not null default '',
+  image       text,
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
 
 create index if not exists golf_clubs_position_idx on golf_clubs(position);
+
+-- Migration for existing tables (run separately if golf_clubs already existed):
+-- alter table golf_clubs add column if not exists image text;

@@ -55,7 +55,7 @@ export async function PATCH(request: Request) {
   const { id, ...patch } = await request.json();
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const k of ['club', 'loft', 'model', 'position'] as const) {
+  for (const k of ['club', 'loft', 'model', 'image', 'position'] as const) {
     if (k in patch) update[k] = patch[k];
   }
   for (const k of ['carry', 'total'] as const) {

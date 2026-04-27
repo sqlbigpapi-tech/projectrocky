@@ -9,6 +9,8 @@ export type Club = {
   carry: number;
   total: number;
   model: string;
+  /** Public URL to a product photo (Supabase Storage). Falls back to category icon. */
+  image?: string | null;
 };
 
 // Default bag (seed). Iron + wedge specs from Club Champion fitting,
