@@ -22,7 +22,7 @@ import {
   TasksSkeleton, IncomeSkeleton,
 } from './components/Skeletons';
 
-type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'games' | 'notifications' | 'guide';
+type MainTab = 'briefing' | 'sports' | 'tasks' | 'finance' | 'personal' | 'games' | 'golf' | 'notifications' | 'guide';
 type FinanceSubTab = 'income' | 'finmodel' | 'headcount' | 'equity' | 'deib';
 type PersonalSubTab = 'networth' | 'cashflow';
 
@@ -211,6 +211,7 @@ const TAB_ICONS: Record<MainTab, (props: { className?: string }) => React.ReactE
   finance: IconFinance,
   personal: IconPersonal,
   games: IconGames,
+  golf: IconGolf,
   notifications: IconAlerts,
   guide: IconAlerts, // placeholder — guide isn't in nav
 };
@@ -293,6 +294,8 @@ export default function Home() {
     } else if (key === 'games') {
       setGamesOpen(o => !o);
       setTab('games');
+    } else if (key === 'golf') {
+      window.location.href = '/golf';
     } else {
       setTab(key);
       setFinanceOpen(false);
@@ -308,6 +311,7 @@ export default function Home() {
     { key: 'finance', label: 'Business', access: ['owner', 'manager', 'team'], section: 'primary' },
     { key: 'personal', label: 'Finance', access: ['owner'], section: 'primary' },
     { key: 'games', label: 'Games', access: ['owner'], section: 'primary' },
+    { key: 'golf', label: 'Golf', access: ['owner'], section: 'primary' },
     { key: 'notifications', label: 'Alerts', access: ['owner'], section: 'admin' },
     { key: 'guide', label: 'Guide', access: ['owner', 'manager', 'team'], section: 'admin' },
   ];
@@ -555,16 +559,6 @@ export default function Home() {
             );
           })}
 
-          {/* Golf — owner-only standalone link to /golf route */}
-          {role === 'owner' && (
-            <a
-              href="/golf"
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-zinc-500 hover:text-zinc-200 hover:bg-[var(--card)]/60 transition-all duration-150 group"
-            >
-              <IconGolf className="w-[16px] h-[16px] shrink-0 text-zinc-600 group-hover:text-zinc-400 transition-colors duration-150" />
-              <span className="flex-1 text-left">Golf</span>
-            </a>
-          )}
         </nav>
 
         {/* Ask Rocky — owner only */}
@@ -717,10 +711,10 @@ export default function Home() {
         <span className="text-black font-bold text-lg font-mono">R</span>
       </button>}
 
-      {/* ── Mobile Bottom Nav ── */}
+      {/* ── Mobile Bottom Nav (primary tabs only — admin tabs available via Spotlight) ── */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--card)]/95 backdrop-blur-lg border-t border-[var(--border)]/60 z-40">
-        <div className="flex items-center justify-around px-2 py-1.5">
-          {MAIN_TABS.map(t => {
+        <div className="flex items-center justify-around px-1 py-1.5">
+          {PRIMARY_TABS.map(t => {
             const Icon = TAB_ICONS[t.key];
             const active = tab === t.key;
             return (
