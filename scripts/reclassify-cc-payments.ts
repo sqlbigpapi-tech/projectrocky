@@ -10,8 +10,11 @@ const CC_PAYMENT_PATTERNS = [
   /amex.*epayment/i,
   /ach.*amex/i,
   /ckfpos.*online.*american.*express/i,
+  /ckfpos.*online.*chase/i,           // "Ckfpos Onlinechase Card Serv Ach Chase Pmt"
+  /chase.*card.*serv.*ach/i,          // belt-and-suspenders for the same Chase variant
   /payment.*citi.*card.*online/i,
   /payment.*american.*express/i,
+  /1st.*natl.*bk.*omah/i,             // "Cr Crd1st Natl Bk Omah Ach Tel-recur 1st Pmt"
   /^online transfer/i,
   /^online payment to/i,
 ];
