@@ -310,41 +310,70 @@ export default function DistanceChart({ clubs, onChanged }: { clubs: Club[]; onC
         {clubs.map(c => (
           <div
             key={c.id ?? c.position}
-            className={`rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-3 ${c.id && pending.has(c.id) ? 'opacity-60' : ''}`}
+            className={`rounded-xl border border-zinc-800 bg-zinc-950/40 p-3 ${c.id && pending.has(c.id) ? 'opacity-60' : ''}`}
           >
+            {/* Top: photo + name + model + delete */}
             <div className="flex items-start gap-3">
               <Thumb club={c} />
               <div className="min-w-0 flex-1">
-                <Cell value={c.club} field="club" onCommit={v => handlePatch(c, 'club', v)} className="text-sm font-semibold text-zinc-100" />
-                <div className="px-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5">
-                  Loft <Cell value={c.loft} field="loft" onCommit={v => handlePatch(c, 'loft', v)} className="text-zinc-400 inline-block w-auto" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Cell
+                      value={c.club}
+                      field="club"
+                      onCommit={v => handlePatch(c, 'club', v)}
+                      className="text-base font-semibold text-zinc-100"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleDelete(c)}
+                    className="text-zinc-700 hover:text-red-400 px-2 py-0.5 -mt-0.5 -mr-1 text-lg leading-none transition shrink-0"
+                    title="Remove club"
+                  >
+                    ×
+                  </button>
                 </div>
+                <Cell
+                  value={c.model}
+                  field="model"
+                  onCommit={v => handlePatch(c, 'model', v)}
+                  className="text-[11px] text-zinc-500 leading-snug"
+                />
               </div>
-              <div className="text-right shrink-0">
-                <div className="flex items-baseline justify-end gap-1">
-                  <Cell value={c.carry} field="carry" onCommit={v => handlePatch(c, 'carry', v)} align="right" className="text-base text-zinc-100 w-14" />
-                  <span className="text-[10px] text-zinc-500">y carry</span>
-                </div>
-                <div className="flex items-baseline justify-end gap-1 mt-0.5">
-                  <Cell value={c.total} field="total" onCommit={v => handlePatch(c, 'total', v)} align="right" className="text-[11px] text-zinc-500 w-12" />
-                  <span className="text-[10px] text-zinc-500">y total</span>
-                </div>
-              </div>
-              <button
-                onClick={() => handleDelete(c)}
-                className="text-zinc-700 hover:text-red-400 px-1.5 py-1 rounded transition self-start"
-                title="Remove club"
-              >
-                ×
-              </button>
             </div>
-            <div className="mt-2 pt-2 border-t border-zinc-800/60 px-1.5">
-              <Cell
-                value={c.model}
-                field="model"
-                onCommit={v => handlePatch(c, 'model', v)}
-                className="text-[11px] text-zinc-500 leading-snug"
-              />
+
+            {/* Bottom: stats row */}
+            <div className="mt-3 pt-3 border-t border-zinc-800/60 grid grid-cols-3 gap-2">
+              <div className="text-center">
+                <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-0.5">Loft</div>
+                <Cell
+                  value={c.loft}
+                  field="loft"
+                  onCommit={v => handlePatch(c, 'loft', v)}
+                  align="left"
+                  className="text-sm text-zinc-300 text-center"
+                />
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-0.5">Carry</div>
+                <Cell
+                  value={c.carry}
+                  field="carry"
+                  onCommit={v => handlePatch(c, 'carry', v)}
+                  align="left"
+                  className="text-sm font-semibold text-zinc-100 tabular-nums text-center"
+                />
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-0.5">Total</div>
+                <Cell
+                  value={c.total}
+                  field="total"
+                  onCommit={v => handlePatch(c, 'total', v)}
+                  align="left"
+                  className="text-sm text-zinc-400 tabular-nums text-center"
+                />
+              </div>
             </div>
           </div>
         ))}
