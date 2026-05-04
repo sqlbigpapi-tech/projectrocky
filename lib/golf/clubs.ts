@@ -18,9 +18,9 @@ export type Club = {
 // Steel Iron 115g shafts, Winn Dri-Tac 2.0 grips, +1° upright,
 // swingweights D1 (irons) → D4 (60°).
 export const DAVID_CLUBS: Club[] = [
-  { position:  0, club: 'Driver',         loft: '10.5°', carry: 248, total: 275, model: 'TaylorMade Qi4d LS' },
-  { position:  1, club: '3 Wood',         loft: '15°',   carry: 220, total: 238, model: 'Callaway Paradym HL' },
-  { position:  2, club: '2 Hybrid',       loft: '17°',   carry: 205, total: 220, model: 'TaylorMade Qi4d' },
+  { position:  0, club: 'Driver',         loft: '9°',    carry: 248, total: 275, model: 'TaylorMade Qi4D LS' },
+  { position:  1, club: '3 Wood',         loft: '15°',   carry: 240, total: 262, model: 'TaylorMade Qi4D' },
+  { position:  2, club: '2 Hybrid',       loft: '17°',   carry: 218, total: 240, model: 'TaylorMade Qi4D' },
   { position:  3, club: '5 Iron',         loft: '22°',   carry: 188, total: 203, model: 'Mizuno JPX-925 Hot Metal Pro' },
   { position:  4, club: '6 Iron',         loft: '25°',   carry: 178, total: 195, model: 'Mizuno JPX-925 Hot Metal Pro' },
   { position:  5, club: '7 Iron',         loft: '28°',   carry: 172, total: 187, model: 'Mizuno JPX-925 Hot Metal Pro' },
