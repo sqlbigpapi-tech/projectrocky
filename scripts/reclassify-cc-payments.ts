@@ -12,8 +12,12 @@ const CC_PAYMENT_PATTERNS = [
   /ckfpos.*online.*american.*express/i,
   /ckfpos.*online.*chase/i,           // "Ckfpos Onlinechase Card Serv Ach Chase Pmt"
   /chase.*card.*serv.*ach/i,          // belt-and-suspenders for the same Chase variant
+  /ach.*debit.*chase.*credit.*crd/i,  // "Ach Debit Chase Credit Crd"
   /payment.*citi.*card.*online/i,
   /payment.*american.*express/i,
+  /ckfpos.*online.*citibank/i,        // "Ckfpos Onlinecitibank Crdt Cd Ach Citibank Pmt"
+  /ckfpos.*online.*best.*buy.*credit/i, // "Ckfpos Onlinebest Buy Credit Ach Best Pmt"
+  /creditcardbarclaycard/i,           // "#### Creditcardbarclaycard Us Ach-recur Barclaycard Creditcard"
   /1st.*natl.*bk.*omah/i,             // "Cr Crd1st Natl Bk Omah Ach Tel-recur 1st Pmt"
   /^online transfer/i,
   /^online payment to/i,
