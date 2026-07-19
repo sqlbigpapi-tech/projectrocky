@@ -6,6 +6,7 @@
   },
   "crons": [
     { "path": "/api/cron/daily-tasks",      "schedule": "0 12 * * *" },
+    { "path": "/api/cron/midday-tasks",     "schedule": "0 17 * * *" },
     { "path": "/api/cron/evening-tasks",    "schedule": "0 0 * * *"  },
     { "path": "/api/cron/bills-due",        "schedule": "0 12 * * *" },
     { "path": "/api/cron/liability-zero",   "schedule": "0 12 * * *" },

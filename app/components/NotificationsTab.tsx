@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 
-type NotifKey = 'notif_daily_tasks' | 'notif_evening_tasks' | 'notif_weekly_networth' | 'notif_liability_zero' | 'notif_week_ahead' | 'notif_engagement_expiry' | 'notif_month_close' | 'notif_revenue_cliff';
+type NotifKey = 'notif_daily_tasks' | 'notif_midday_tasks' | 'notif_evening_tasks' | 'notif_weekly_networth' | 'notif_liability_zero' | 'notif_week_ahead' | 'notif_engagement_expiry' | 'notif_month_close' | 'notif_revenue_cliff';
 
 const ALERTS: { key: NotifKey; label: string; schedule: string; description: string; emoji: string }[] = [
   {
@@ -10,6 +10,13 @@ const ALERTS: { key: NotifKey; label: string; schedule: string; description: str
     schedule: 'Every day at 8am',
     description: 'Tasks due today and any overdue items.',
     emoji: '🗂',
+  },
+  {
+    key: 'notif_midday_tasks',
+    label: 'Midday Task Check',
+    schedule: 'Every day at 1pm',
+    description: 'Lunchtime nudge for tasks still due today or overdue.',
+    emoji: '🕐',
   },
   {
     key: 'notif_evening_tasks',
@@ -65,6 +72,7 @@ const ALERTS: { key: NotifKey; label: string; schedule: string; description: str
 export default function NotificationsTab() {
   const [enabled, setEnabled] = useState<Record<NotifKey, boolean>>({
     notif_daily_tasks: true,
+    notif_midday_tasks: true,
     notif_evening_tasks: true,
     notif_weekly_networth: true,
     notif_liability_zero: true,
