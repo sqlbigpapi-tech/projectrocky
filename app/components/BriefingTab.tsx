@@ -62,11 +62,27 @@ const CATEGORY_COLORS: Record<string, string> = {
   'South Florida': 'text-teal-400',
 };
 
-type NavTab = 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'networth' | 'finmodel' | 'headcount' | 'equity';
-type EquitySummary = { sharePrice: number; valuation: number; trailing12: number; month: number; isForecast: boolean };
-type EndingSoonItem = { consultantName: string; client: string; sowEnd: string; annualTotal: number };
+type NavTab = 'briefing' | 'sports' | 'bd' | 'tasks' | 'income' | 'health' | 'networth' | 'finmodel' | 'headcount' | 'equity' | 'cashflow';
 type CalEvent = { summary: string; start: string; end: string; location: string; isAllDay: boolean };
 type TimeOfDay = 'morning' | 'midday' | 'afternoon' | 'evening' | 'late';
+type MoneyTx = { date: string; name: string; amount: number; category: string | null; account: string | null };
+type MoneySignals = {
+  yesterday: string;
+  largeCharges: MoneyTx[];
+  newMerchants: MoneyTx[];
+  possibleDupes: { tx: MoneyTx; partner: MoneyTx }[];
+  categoryAlerts: { category: string; weekSpend: number; avg: number; ratio: number }[];
+};
+type Subscription = {
+  merchant: string;
+  cadence: 'monthly' | 'quarterly' | 'annual';
+  amount: number;
+  monthlyEquivalent: number;
+  firstSeen: string;
+  lastSeen: string;
+  active: boolean;
+};
+type SubSummary = { active_count: number; active_monthly_total: number; active_annual_total: number };
 
 export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab) => void }) {
   const [briefing, setBriefing] = useState<{ summary: string; timeOfDay: TimeOfDay } | null>(null);
@@ -78,9 +94,12 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
   const [news, setNews] = useState<NewsItem[]>([]);
   const [incomeMonths, setIncomeMonths] = useState<IncomeMonth[]>([]);
   const [netWorthSnaps, setNetWorthSnaps] = useState<{ id: string; date: string; accounts: { category: string; balance: number }[] }[]>([]);
-  const [equitySummary, setEquitySummary] = useState<EquitySummary | null>(null);
-  const [endingSoon, setEndingSoon] = useState<EndingSoonItem[]>([]);
-  const [forecastRevenue, setForecastRevenue] = useState<{ month: number; revenue: number }[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[] | null>(null);
+  const [subSummary, setSubSummary] = useState<SubSummary | null>(null);
+  const [moneySignals, setMoneySignals] = useState<MoneySignals | null>(null);
+  const [tomorrowEvents, setTomorrowEvents] = useState<CalEvent[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
   const [now, setNow] = useState(new Date());
   const [mounted, setMounted] = useState(false);
 
@@ -139,26 +158,39 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
         .then(d => { if (d && !d.error) setTeamFeeds(prev => [...prev.filter(f => f.team.id !== d.team.id), d]); });
     }
     safe(fetch('/api/income')).then(d => { if (d?.months) setIncomeMonths(d.months); });
-    safe(fetch('/api/equity?year=2026')).then(d => { if (d?.latest) setEquitySummary(d.latest); });
-    safe(fetch('/api/billing?year=2026')).then(d => {
-      if (d?.forecast) {
-        const today = new Date();
-        const sixtyOut = new Date(today); sixtyOut.setDate(sixtyOut.getDate() + 60);
-        setEndingSoon(d.forecast.filter((f: any) => {
-          const end = new Date(f.sowEnd);
-          return end >= today && end <= sixtyOut;
-        }).map((f: any) => ({ consultantName: f.consultantName, client: f.client, sowEnd: f.sowEnd, annualTotal: f.annualTotal })));
-      }
+    safe(fetch('/api/money-signals')).then(d => {
+      if (d && !d.error) setMoneySignals(d as MoneySignals);
     });
-    safe(fetch('/api/pl?year=2026')).then(d => {
-      if (d?.months) {
-        const currentMonth = new Date().getMonth() + 1;
-        const upcoming = d.months.filter((m: any) => m.month >= currentMonth && m.month <= currentMonth + 2);
-        setForecastRevenue(upcoming.map((m: any) => ({ month: m.month, revenue: m.revenue })));
-      }
+    safe(fetch('/api/subscriptions')).then(d => {
+      if (d?.subscriptions) setSubscriptions(d.subscriptions as Subscription[]);
+      if (d?.summary) setSubSummary(d.summary as SubSummary);
     });
-    // Rocky greeting removed — no data sent to AI on page load
+    // Tomorrow's calendar — for the "no more today, here's what's next" hint
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowISO = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    safe(fetch(`/api/calendar?date=${tomorrowISO}`)).then(d => { if (d?.events) setTomorrowEvents(d.events); });
   }, []);
+
+  async function addQuickTask(e: React.FormEvent) {
+    e.preventDefault();
+    const title = newTaskTitle.trim();
+    if (!title || savingTask) return;
+    setSavingTask(true);
+    const todayISO = new Date().toISOString().split('T')[0];
+    try {
+      const r = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, priority: 'Medium', due_date: todayISO, category: 'Personal' }),
+      });
+      const j = await r.json();
+      if (j?.task) setTasks(prev => [j.task, ...prev]);
+      setNewTaskTitle('');
+    } finally {
+      setSavingTask(false);
+    }
+  }
 
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -326,131 +358,283 @@ export default function BriefingTab({ onNavigate }: { onNavigate?: (tab: NavTab)
         <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
 
           {/* Calendar */}
-          {calEvents.length > 0 && (
-            <>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Today's Schedule</p>
-                <p className="text-[10px] text-zinc-600 font-mono">{nonAllDayEvents.length} meeting{nonAllDayEvents.length !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="space-y-0.5 mb-4">
-                {calEvents.map((e, i) => {
-                  const startTime = e.isAllDay ? null : new Date(e.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
-                  const isPast = !e.isAllDay && new Date(e.end) < now;
-                  const isCurrent = !e.isAllDay && new Date(e.start) <= now && new Date(e.end) > now;
-                  return (
-                    <div key={i} className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-all ${
-                      isCurrent ? 'bg-amber-500/10 border border-amber-500/20' :
-                      isPast ? 'opacity-40' :
-                      'hover:bg-zinc-800/50'
-                    }`}>
-                      {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
-                      {!isCurrent && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isPast ? 'bg-zinc-700' : 'bg-zinc-600'}`} />}
-                      <span className="text-[10px] text-zinc-500 font-mono tabular-nums w-16 shrink-0">
-                        {e.isAllDay ? 'All day' : startTime}
-                      </span>
-                      <p className={`text-[11px] flex-1 truncate ${isCurrent ? 'text-amber-400 font-medium' : 'text-zinc-300'}`}>{e.summary}</p>
-                      {e.location && !e.isAllDay && (
-                        <span className="text-[9px] text-zinc-700 font-mono shrink-0 truncate max-w-[60px]">{e.location.includes('Teams') ? 'Teams' : e.location.slice(0, 10)}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="border-t border-[var(--border)]/60 pt-3 mb-1" />
-            </>
-          )}
+          {(() => {
+            const futureMeetings = nonAllDayEvents.filter(e => new Date(e.end) > now);
+            const nextEvt = futureMeetings.find(e => new Date(e.start) > now);
+            const minsUntilNext = nextEvt ? Math.round((new Date(nextEvt.start).getTime() - now.getTime()) / 60000) : null;
+            const countdownLabel = minsUntilNext == null ? null
+              : minsUntilNext <= 0 ? 'starting now'
+              : minsUntilNext < 60 ? `in ${minsUntilNext}m`
+              : `in ${Math.floor(minsUntilNext / 60)}h ${minsUntilNext % 60}m`;
+            const countdownColor = minsUntilNext == null ? 'text-zinc-600'
+              : minsUntilNext <= 10 ? 'text-red-400'
+              : minsUntilNext <= 30 ? 'text-amber-400'
+              : 'text-zinc-500';
 
-          <div className="flex items-center justify-between mb-3">
+            // Conflict detection — events overlap if same person has two at the same time
+            const conflictIds = new Set<number>();
+            for (let i = 0; i < calEvents.length; i++) {
+              if (calEvents[i].isAllDay) continue;
+              for (let j = i + 1; j < calEvents.length; j++) {
+                if (calEvents[j].isAllDay) continue;
+                const aS = new Date(calEvents[i].start).getTime();
+                const aE = new Date(calEvents[i].end).getTime();
+                const bS = new Date(calEvents[j].start).getTime();
+                const bE = new Date(calEvents[j].end).getTime();
+                if (aS < bE && bS < aE) { conflictIds.add(i); conflictIds.add(j); }
+              }
+            }
+
+            const todayHasContent = calEvents.length > 0;
+            const allDoneToday = todayHasContent && futureMeetings.length === 0;
+            const tomorrowFirstMeeting = tomorrowEvents.filter(e => !e.isAllDay)[0];
+
+            if (!todayHasContent && !tomorrowFirstMeeting) return null;
+
+            return (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">
+                    {todayHasContent ? "Today's Schedule" : 'Tomorrow'}
+                  </p>
+                  {todayHasContent && (
+                    <p className="text-[10px] text-zinc-600 font-mono">
+                      {nonAllDayEvents.length} meeting{nonAllDayEvents.length !== 1 ? 's' : ''}
+                      {countdownLabel && <span className={`ml-1.5 font-bold ${countdownColor}`}>· next {countdownLabel}</span>}
+                    </p>
+                  )}
+                </div>
+                {todayHasContent && (
+                  <div className="space-y-0.5 mb-4">
+                    {calEvents.map((e, i) => {
+                      const startTime = e.isAllDay ? null : new Date(e.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+                      const isPast = !e.isAllDay && new Date(e.end) < now;
+                      const isCurrent = !e.isAllDay && new Date(e.start) <= now && new Date(e.end) > now;
+                      const isConflict = conflictIds.has(i) && !isPast;
+                      return (
+                        <div key={i} className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-all ${
+                          isCurrent ? 'bg-amber-500/10 border border-amber-500/20' :
+                          isConflict ? 'bg-red-500/5 border border-red-500/20' :
+                          isPast ? 'opacity-40' :
+                          'hover:bg-zinc-800/50'
+                        }`}>
+                          {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />}
+                          {!isCurrent && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConflict ? 'bg-red-400' : isPast ? 'bg-zinc-700' : 'bg-zinc-600'}`} />}
+                          <span className="text-[10px] text-zinc-500 font-mono tabular-nums w-16 shrink-0">
+                            {e.isAllDay ? 'All day' : startTime}
+                          </span>
+                          <p className={`text-[11px] flex-1 truncate ${isCurrent ? 'text-amber-400 font-medium' : isConflict ? 'text-red-300' : 'text-zinc-300'}`}>{e.summary}</p>
+                          {isConflict && <span className="text-[9px] text-red-400 font-mono shrink-0" title="time conflict">⚠</span>}
+                          {e.location && !e.isAllDay && (
+                            <span className="text-[9px] text-zinc-700 font-mono shrink-0 truncate max-w-[60px]">{e.location.includes('Teams') ? 'Teams' : e.location.slice(0, 10)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {allDoneToday && tomorrowFirstMeeting && (
+                      <div className="flex items-center gap-2.5 px-2 py-1.5 mt-1 border-t border-[var(--border)]/40 pt-2">
+                        <span className="text-[9px] font-mono text-zinc-600 shrink-0 w-16">TOMORROW</span>
+                        <span className="text-[10px] text-zinc-500 font-mono tabular-nums shrink-0">
+                          {new Date(tomorrowFirstMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })}
+                        </span>
+                        <p className="text-[11px] text-zinc-400 flex-1 truncate">{tomorrowFirstMeeting.summary}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="border-t border-[var(--border)]/60 pt-3 mb-1" />
+              </>
+            );
+          })()}
+
+          <div className="flex items-center justify-between mb-2">
             <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">
               {briefing?.timeOfDay === 'evening' || briefing?.timeOfDay === 'late' ? 'Next Up' : 'Tasks'}
             </p>
             <button onClick={() => onNavigate?.('tasks')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">{openTasks.length} open →</button>
           </div>
+
+          {/* Quick add */}
+          <form onSubmit={addQuickTask} className="flex items-center gap-1.5 mb-2">
+            <span className="text-zinc-600 text-sm shrink-0 pl-1">+</span>
+            <input
+              type="text"
+              value={newTaskTitle}
+              onChange={e => setNewTaskTitle(e.target.value)}
+              placeholder="Quick add for today…"
+              className="flex-1 bg-transparent border-0 border-b border-zinc-800 focus:border-amber-500/40 focus:outline-none text-[11px] text-zinc-300 placeholder:text-zinc-700 py-1 px-0 transition-colors"
+              disabled={savingTask}
+            />
+            {newTaskTitle.trim() && (
+              <button type="submit" disabled={savingTask} className="text-[10px] font-mono text-amber-400 hover:text-amber-300 shrink-0 disabled:opacity-50">{savingTask ? '…' : '↵'}</button>
+            )}
+          </form>
+
           {upcomingTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 gap-1.5">
               <span className="text-lg text-zinc-700">✓</span>
               <p className="text-[10px] text-zinc-600 font-mono">All clear</p>
             </div>
-          ) : (
-            <div className="space-y-1">
-              {upcomingTasks.slice(0, 7).map(task => {
-                const label = task.due_date ? taskDueLabel(task.due_date) : { text: 'Today', color: 'text-cyan-400' };
-                const isOverdue = label.text === 'Overdue';
-                const isToday = label.text === 'Today';
-                return (
-                  <div key={task.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all ${
-                    isOverdue ? 'bg-red-500/5' : isToday ? 'bg-amber-500/5' : 'hover:bg-zinc-800/50'
-                  }`}>
-                    <button onClick={() => completeTask(task)} className="w-3.5 h-3.5 rounded border border-zinc-700 hover:border-emerald-400 shrink-0 transition-colors" />
-                    <p onClick={() => onNavigate?.('tasks')} className="text-[11px] text-zinc-300 flex-1 truncate cursor-pointer hover:text-white transition-colors">{task.title}</p>
-                    <span className={`text-[9px] font-mono shrink-0 ${label.color}`}>{label.text}</span>
-                  </div>
-                );
-              })}
-              {upcomingTasks.length > 7 && (
-                <button onClick={() => onNavigate?.('tasks')} className="text-[10px] text-zinc-600 font-mono hover:text-zinc-400 transition-colors pl-2 pt-1">
-                  +{upcomingTasks.length - 7} more
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Col 2: Business */}
-        <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Business</p>
-            <div className="flex gap-2">
-              <button onClick={() => onNavigate?.('equity')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">equity →</button>
-              <button onClick={() => onNavigate?.('finmodel')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">model →</button>
-            </div>
-          </div>
-
-          {equitySummary && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4">
-              <div>
-                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Valuation</p>
-                <p className="text-sm font-bold text-white tabular-nums">{kpiFmt(equitySummary.valuation)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">T12 Net Income</p>
-                <p className={`text-sm font-bold tabular-nums ${equitySummary.trailing12 >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{kpiFmt(equitySummary.trailing12)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Next 3 Mo Rev</p>
-                <p className="text-sm font-bold text-zinc-300 tabular-nums">
-                  {forecastRevenue.length > 0 ? kpiFmt(forecastRevenue.reduce((s, m) => s + m.revenue, 0)) : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-600 font-mono mb-0.5">Run Rate</p>
-                <p className="text-sm font-bold text-zinc-300 tabular-nums">{kpiFmt(runRate)}/mo</p>
-              </div>
-            </div>
-          )}
-
-          {/* Engagements ending soon */}
-          {endingSoon.length > 0 && (
-            <div className="pt-3 border-t border-[var(--border)]/60">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-red-400/70 uppercase tracking-widest font-mono font-bold">Ending Soon</p>
-                <button onClick={() => onNavigate?.('headcount')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">→</button>
-              </div>
-              <div className="space-y-1">
-                {endingSoon.map((e, i) => (
-                  <div key={i} className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-red-500/5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[11px] text-white font-bold font-mono truncate">{e.consultantName}</span>
-                      <span className="text-[9px] text-zinc-600 font-mono truncate">@ {e.client}</span>
+          ) : (() => {
+            // Group: Overdue / Today / Tomorrow / Later this week
+            const tomorrowMs = today.getTime() + 86400000;
+            const dayAfterMs = today.getTime() + 2 * 86400000;
+            const buckets: { label: string; color: string; bg: string; items: typeof upcomingTasks }[] = [
+              { label: 'Overdue',  color: 'text-red-400/80',   bg: 'bg-red-500/5',   items: [] },
+              { label: 'Today',    color: 'text-amber-400/80', bg: 'bg-amber-500/5', items: [] },
+              { label: 'Tomorrow', color: 'text-zinc-400',     bg: '',               items: [] },
+              { label: 'Later',    color: 'text-zinc-500',     bg: '',               items: [] },
+            ];
+            for (const t of upcomingTasks) {
+              if (!t.due_date) { buckets[1].items.push(t); continue; } // recurring daily → Today
+              const d = new Date(t.due_date + 'T00:00:00').getTime();
+              if (d < today.getTime()) buckets[0].items.push(t);
+              else if (d < tomorrowMs) buckets[1].items.push(t);
+              else if (d < dayAfterMs) buckets[2].items.push(t);
+              else buckets[3].items.push(t);
+            }
+            return (
+              <div className="space-y-2">
+                {buckets.map(b => b.items.length === 0 ? null : (
+                  <div key={b.label}>
+                    <div className="flex items-center justify-between px-1 mb-1">
+                      <p className={`text-[9px] font-mono uppercase tracking-wider font-bold ${b.color}`}>{b.label}</p>
+                      <p className={`text-[9px] font-mono ${b.color}`}>{b.items.length}</p>
                     </div>
-                    <span className="text-[9px] text-red-400 font-mono shrink-0 ml-2">
-                      {new Date(e.sowEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
+                    <div className="space-y-0.5">
+                      {b.items.slice(0, 6).map(task => {
+                        const priColor = PRIORITY_DOT[task.priority] ?? 'bg-zinc-700';
+                        return (
+                          <div key={task.id} className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-all ${b.bg || 'hover:bg-zinc-800/50'}`}>
+                            <button onClick={() => completeTask(task)} className="w-3.5 h-3.5 rounded border border-zinc-700 hover:border-emerald-400 shrink-0 transition-colors" aria-label="complete" />
+                            <span className={`w-1 h-1 rounded-full shrink-0 ${priColor}`} title={task.priority} />
+                            <p onClick={() => onNavigate?.('tasks')} className="text-[11px] text-zinc-300 flex-1 truncate cursor-pointer hover:text-white transition-colors">{task.title}</p>
+                          </div>
+                        );
+                      })}
+                      {b.items.length > 6 && (
+                        <button onClick={() => onNavigate?.('tasks')} className="text-[9px] text-zinc-600 font-mono hover:text-zinc-400 transition-colors pl-3">
+                          +{b.items.length - 6} more
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            );
+          })()}
+        </div>
+
+        {/* Col 2: Alerts (unusual activity + SOWs ending soon) */}
+        <div className="rounded-xl border border-zinc-800 bg-[var(--card)]/50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Alerts</p>
+            <button onClick={() => onNavigate?.('cashflow')} className="text-[10px] text-zinc-600 font-mono hover:text-amber-400 transition-colors">cash flow →</button>
+          </div>
+
+          {(() => {
+            const hasMoney = moneySignals && (
+              moneySignals.largeCharges.length > 0 ||
+              moneySignals.newMerchants.length > 0 ||
+              moneySignals.possibleDupes.length > 0 ||
+              moneySignals.categoryAlerts.length > 0
+            );
+            if (!moneySignals) {
+              return (
+                <div className="space-y-1.5">
+                  {[1, 2, 3].map(i => <div key={i} className="skeleton h-7 w-full rounded-lg" />)}
+                </div>
+              );
+            }
+            if (!hasMoney) {
+              return (
+                <div className="flex flex-col items-center justify-center py-4 gap-1.5">
+                  <span className="text-lg text-zinc-700">✓</span>
+                  <p className="text-[10px] text-zinc-600 font-mono">No unusual activity yesterday</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-1.5">
+                {moneySignals.largeCharges.slice(0, 3).map((t, i) => (
+                  <div key={`l${i}`} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+                    <span className="text-[9px] font-bold font-mono text-amber-400 shrink-0">LARGE</span>
+                    <p className="text-[11px] text-zinc-300 flex-1 truncate">{t.name}</p>
+                    <span className="text-[11px] text-amber-400 font-mono font-bold tabular-nums shrink-0">${Math.round(Number(t.amount)).toLocaleString()}</span>
+                  </div>
+                ))}
+                {moneySignals.newMerchants.slice(0, 3).map((t, i) => (
+                  <div key={`n${i}`} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors">
+                    <span className="text-[9px] font-bold font-mono text-cyan-400 shrink-0">NEW</span>
+                    <p className="text-[11px] text-zinc-300 flex-1 truncate">{t.name}</p>
+                    <span className="text-[11px] text-cyan-400 font-mono tabular-nums shrink-0">${Math.round(Number(t.amount)).toLocaleString()}</span>
+                  </div>
+                ))}
+                {moneySignals.possibleDupes.slice(0, 2).map(({ tx }, i) => (
+                  <div key={`d${i}`} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-500/5 hover:bg-red-500/10 transition-colors">
+                    <span className="text-[9px] font-bold font-mono text-red-400 shrink-0">DUP?</span>
+                    <p className="text-[11px] text-zinc-300 flex-1 truncate">{tx.name} ×2</p>
+                    <span className="text-[11px] text-red-400 font-mono tabular-nums shrink-0">${Math.round(Number(tx.amount)).toLocaleString()}</span>
+                  </div>
+                ))}
+                {moneySignals.categoryAlerts.slice(0, 2).map((a, i) => (
+                  <div key={`c${i}`} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-orange-500/5 hover:bg-orange-500/10 transition-colors">
+                    <span className="text-[9px] font-bold font-mono text-orange-400 shrink-0">HOT</span>
+                    <p className="text-[11px] text-zinc-300 flex-1 truncate">{a.category}</p>
+                    <span className="text-[10px] text-orange-400 font-mono tabular-nums shrink-0">${a.weekSpend.toLocaleString()} ({a.ratio}×)</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Subscriptions watchlist */}
+          {subscriptions && subscriptions.length > 0 && (() => {
+            const activeSubs = subscriptions.filter(s => s.active);
+            const thirtyAgo = new Date(today.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+            const newSubs = activeSubs.filter(s => s.firstSeen >= thirtyAgo);
+            const newSubKeys = new Set(newSubs.map(s => s.merchant));
+            const remaining = activeSubs
+              .filter(s => !newSubKeys.has(s.merchant))
+              .sort((a, b) => b.monthlyEquivalent - a.monthlyEquivalent);
+            const display = [...newSubs, ...remaining].slice(0, 5);
+
+            const cadenceTag = (c: Subscription['cadence']) => c === 'monthly' ? '/mo' : c === 'quarterly' ? '/qtr' : '/yr';
+
+            return (
+              <div className="mt-4 pt-3 border-t border-[var(--border)]/60">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono font-bold">Subscriptions</p>
+                  {subSummary && (
+                    <p className="text-[10px] text-zinc-600 font-mono tabular-nums">
+                      ${Math.round(subSummary.active_monthly_total).toLocaleString()}<span className="text-zinc-700">/mo · {subSummary.active_count}</span>
+                    </p>
+                  )}
+                </div>
+                {newSubs.length > 0 && (
+                  <p className="text-[9px] text-cyan-400/80 font-mono mb-1.5">
+                    {newSubs.length} new in last 30d — recognize {newSubs.length === 1 ? 'it' : 'these'}?
+                  </p>
+                )}
+                <div className="space-y-1">
+                  {display.map((s, i) => {
+                    const isNew = newSubKeys.has(s.merchant);
+                    return (
+                      <div key={i} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
+                        isNew ? 'bg-cyan-500/5 hover:bg-cyan-500/10' : 'hover:bg-zinc-800/50'
+                      }`}>
+                        {isNew && <span className="text-[9px] font-bold font-mono text-cyan-400 shrink-0">NEW</span>}
+                        <p className="text-[11px] text-zinc-300 flex-1 truncate">{s.merchant}</p>
+                        <span className="text-[11px] text-zinc-400 font-mono tabular-nums shrink-0">
+                          ${Math.round(s.amount).toLocaleString()}<span className="text-zinc-600">{cadenceTag(s.cadence)}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Col 3: Finance Snapshot */}
